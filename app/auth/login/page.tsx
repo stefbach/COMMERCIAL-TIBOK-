@@ -1,40 +1,54 @@
 "use client"
 
 import type React from "react"
-
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function Page() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string>("")
   const router = useRouter()
+
+  useEffect(() => {
+    // Vérification des variables d'environnement côté client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    let debug = `URL: ${supabaseUrl ? 'OK' : 'MISSING'}, KEY: ${supabaseKey ? 'OK' : 'MISSING'}`
+    setDebugInfo(debug)
+    
+    if (!supabaseUrl || !supabaseKey) {
+      setError("Variables d'environnement Supabase manquantes")
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
     try {
+      // Import dynamique pour éviter les erreurs de build
+      const { createClient } = await import("@/lib/supabase/client")
+      const supabase = createClient()
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/protected`,
-        },
       })
+      
       if (error) throw error
       router.push("/protected")
     } catch (error: unknown) {
+      console.error('Login error:', error)
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
@@ -47,8 +61,9 @@ export default function Page() {
         <div className="flex flex-col gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">Login</CardTitle>
+              <CardTitle className="text-2xl">Login (Debug)</CardTitle>
               <CardDescription>Enter your email below to login to your account</CardDescription>
+              {debugInfo && <p className="text-xs text-blue-600">Debug: {debugInfo}</p>}
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin}>
