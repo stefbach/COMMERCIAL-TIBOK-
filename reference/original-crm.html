@@ -1,0 +1,2377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Universe - Prospection & Pipeline Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        .sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+        .content-area {
+            transition: margin-left 0.3s ease-in-out;
+        }
+        .card-hover {
+            transition: all 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .deal-card {
+            cursor: move;
+            transition: all 0.2s ease;
+        }
+        .deal-card:hover {
+            transform: scale(1.02);
+        }
+        .sortable-ghost {
+            opacity: 0.5;
+            background: #e5e7eb;
+        }
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        .search-highlight {
+            background-color: #fef3c7;
+            color: #92400e;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        @media print {
+            .sidebar { transform: translateX(-100%); }
+            .content-area { margin-left: 0; }
+            .no-print { display: none; }
+        }
+        .activity-timeline::before {
+            content: '';
+            position: absolute;
+            left: 12px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e5e7eb;
+        }
+        .activity-item {
+            position: relative;
+        }
+        .activity-item::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #3b82f6;
+            border: 2px solid white;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Authentication Modal -->
+    <div id="authModal" class="fixed inset-0 z-50 modal-overlay flex items-center justify-center">
+        <div class="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">CRM Universe Login</h2>
+            <form id="loginForm">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                    <input type="email" id="loginEmail" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Role</label>
+                    <select id="loginRole" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        <option value="admin">Admin</option>
+                        <option value="manager">Manager</option>
+                        <option value="rep">Sales Rep</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Login
+                </button>
+            </form>
+            <div class="mt-4 text-center">
+                <button id="demoDataBtn" class="text-blue-600 hover:text-blue-800 text-sm">
+                    <i class="fas fa-database mr-1"></i>Load Demo Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-40 transform">
+        <div class="p-6 border-b">
+            <div class="flex items-center">
+                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <div class="ml-3">
+                    <h1 class="text-xl font-bold text-gray-800">CRM Universe</h1>
+                    <p class="text-sm text-gray-600" id="userInfo"></p>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="mt-6">
+            <a href="#" class="nav-item flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition" data-view="dashboard">
+                <i class="fas fa-tachometer-alt w-5"></i>
+                <span class="ml-3">Dashboard</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition" data-view="organizations">
+                <i class="fas fa-building w-5"></i>
+                <span class="ml-3">Organizations</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition" data-view="contacts">
+                <i class="fas fa-users w-5"></i>
+                <span class="ml-3">Contacts</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition" data-view="pipeline">
+                <i class="fas fa-stream w-5"></i>
+                <span class="ml-3">Pipeline</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition" data-view="activities">
+                <i class="fas fa-calendar-alt w-5"></i>
+                <span class="ml-3">Activities</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition" data-view="settings">
+                <i class="fas fa-cog w-5"></i>
+                <span class="ml-3">Settings</span>
+            </a>
+        </nav>
+
+        <div class="absolute bottom-0 w-full p-6 border-t">
+            <button id="logoutBtn" class="flex items-center text-gray-600 hover:text-gray-800 transition">
+                <i class="fas fa-sign-out-alt w-5"></i>
+                <span class="ml-3">Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="content-area ml-64 min-h-screen">
+        <!-- Top Bar -->
+        <div class="bg-white shadow-sm border-b p-4 flex items-center justify-between no-print">
+            <div class="flex items-center space-x-4">
+                <button id="sidebarToggle" class="text-gray-600 hover:text-gray-800 lg:hidden">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="relative">
+                    <input type="text" id="globalSearch" placeholder="Search organizations, contacts..." 
+                           class="w-96 pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="quickAddBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Quick Add
+                </button>
+                <div class="relative">
+                    <button id="notificationBtn" class="text-gray-600 hover:text-gray-800 relative">
+                        <i class="fas fa-bell text-xl"></i>
+                        <span id="notificationCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboardView" class="view-content p-6">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold text-gray-800">Dashboard</h2>
+                <p class="text-gray-600">Overview of your sales performance</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Total Organizations</p>
+                            <p class="text-2xl font-bold text-gray-800" id="totalOrganizations">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-building text-blue-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Active Deals</p>
+                            <p class="text-2xl font-bold text-gray-800" id="activeDeals">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-handshake text-green-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Pipeline Value</p>
+                            <p class="text-2xl font-bold text-gray-800" id="pipelineValue">$0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-dollar-sign text-yellow-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Win Rate</p>
+                            <p class="text-2xl font-bold text-gray-800" id="winRate">0%</p>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-trophy text-purple-600"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Pipeline Funnel</h3>
+                    <canvas id="pipelineChart" style="height: 300px;"></canvas>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Monthly Revenue</h3>
+                    <canvas id="revenueChart" style="height: 300px;"></canvas>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Activities This Week</h3>
+                    <canvas id="activitiesChart" style="height: 300px;"></canvas>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Deal Sources</h3>
+                    <canvas id="sourcesChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Organizations View -->
+        <div id="organizationsView" class="view-content p-6 hidden">
+            <div class="mb-6 flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-800">Organizations</h2>
+                    <p class="text-gray-600">Manage your client organizations</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="importOrgsBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-upload mr-2"></i>Import CSV
+                    </button>
+                    <button id="exportOrgsBtn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">
+                        <i class="fas fa-download mr-2"></i>Export CSV
+                    </button>
+                    <button id="addOrgBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-plus mr-2"></i>Add Organization
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="bg-white p-4 rounded-lg shadow mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                        <select id="industryFilter" class="w-full border rounded px-3 py-2">
+                            <option value="">All Industries</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                        <select id="countryFilter" class="w-full border rounded px-3 py-2">
+                            <option value="">All Countries</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Size</label>
+                        <select id="sizeFilter" class="w-full border rounded px-3 py-2">
+                            <option value="">All Sizes</option>
+                            <option value="Small">Small</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Large">Large</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select id="statusFilter" class="w-full border rounded px-3 py-2">
+                            <option value="">All Status</option>
+                            <option value="Prospect">Prospect</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button id="clearFiltersBtn" class="w-full bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition">
+                            Clear Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Organizations List -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Industry</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacts</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deals</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Contact</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="organizationsTable" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="organizationsPagination" class="px-6 py-3 border-t border-gray-200">
+                    <!-- Pagination will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Contacts View -->
+        <div id="contactsView" class="view-content p-6 hidden">
+            <div class="mb-6 flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-800">Contacts</h2>
+                    <p class="text-gray-600">Manage your contact database</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="importContactsBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-upload mr-2"></i>Import CSV
+                    </button>
+                    <button id="addContactBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-plus mr-2"></i>Add Contact
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contacts List -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contactsTable" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline View -->
+        <div id="pipelineView" class="view-content p-6 hidden">
+            <div class="mb-6 flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-800">Sales Pipeline</h2>
+                    <p class="text-gray-600">Drag deals between stages</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <select id="pipelineOwnerFilter" class="border rounded px-3 py-2">
+                        <option value="">All Owners</option>
+                    </select>
+                    <button id="addDealBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-plus mr-2"></i>Add Deal
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pipeline Kanban -->
+            <div id="pipelineKanban" class="grid grid-cols-1 lg:grid-cols-7 gap-4">
+                <!-- Stages will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Activities View -->
+        <div id="activitiesView" class="view-content p-6 hidden">
+            <div class="mb-6 flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-800">Activities</h2>
+                    <p class="text-gray-600">Track all interactions and tasks</p>
+                </div>
+                <button id="addActivityBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Log Activity
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Activities Timeline -->
+                <div class="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Recent Activities</h3>
+                    <div id="activitiesTimeline" class="activity-timeline relative pl-8">
+                        <!-- Activities will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Tasks Sidebar -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Upcoming Tasks</h3>
+                    <div id="tasksList">
+                        <!-- Tasks will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settingsView" class="view-content p-6 hidden">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold text-gray-800">Settings</h2>
+                <p class="text-gray-600">Configure your CRM preferences</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Pipeline Stages -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Pipeline Stages</h3>
+                    <div id="stagesList">
+                        <!-- Stages configuration will be here -->
+                    </div>
+                    <button id="addStageBtn" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                        <i class="fas fa-plus mr-2"></i>Add Stage
+                    </button>
+                </div>
+
+                <!-- Data Management -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Data Management</h3>
+                    <div class="space-y-4">
+                        <button id="exportAllBtn" class="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
+                            <i class="fas fa-download mr-2"></i>Export All Data
+                        </button>
+                        <button id="importAllBtn" class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                            <i class="fas fa-upload mr-2"></i>Import All Data
+                        </button>
+                        <button id="clearAllBtn" class="w-full bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
+                            <i class="fas fa-trash mr-2"></i>Clear All Data
+                        </button>
+                        <button id="loadDemoBtn" class="w-full bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">
+                            <i class="fas fa-database mr-2"></i>Load Demo Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Organization Modal -->
+    <div id="organizationModal" class="fixed inset-0 z-50 modal-overlay hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800" id="orgModalTitle">Organization Details</h3>
+                        <button class="text-gray-600 hover:text-gray-800" onclick="closeModal('organizationModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <!-- Tabs -->
+                    <div class="border-b mb-6">
+                        <nav class="flex space-x-8">
+                            <button class="org-tab py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 active" data-tab="overview">
+                                Overview
+                            </button>
+                            <button class="org-tab py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="contacts">
+                                Contacts <span id="contactsCount" class="bg-gray-200 text-gray-700 ml-1 py-1 px-2 rounded-full text-xs">0</span>
+                            </button>
+                            <button class="org-tab py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="deals">
+                                Deals <span id="dealsCount" class="bg-gray-200 text-gray-700 ml-1 py-1 px-2 rounded-full text-xs">0</span>
+                            </button>
+                            <button class="org-tab py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="activities">
+                                Activities <span id="activitiesCount" class="bg-gray-200 text-gray-700 ml-1 py-1 px-2 rounded-full text-xs">0</span>
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Overview Tab -->
+                    <div id="overviewTab" class="tab-content">
+                        <form id="organizationForm">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                                    <input type="text" id="orgName" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Industry</label>
+                                    <select id="orgIndustry" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                        <option value="">Select Industry</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                                    <input type="text" id="orgCountry" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">City</label>
+                                    <input type="text" id="orgCity" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Website</label>
+                                    <input type="url" id="orgWebsite" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Size</label>
+                                    <select id="orgSize" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                        <option value="">Select Size</option>
+                                        <option value="Small">Small</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="Large">Large</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                                    <select id="orgStatus" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                        <option value="Prospect">Prospect</option>
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                                    <input type="text" id="orgTags" placeholder="Comma separated tags" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                </div>
+                            </div>
+                            <div class="mt-6 flex justify-end space-x-4">
+                                <button type="button" onclick="closeModal('organizationModal')" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Save</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Contacts Tab -->
+                    <div id="contactsTab" class="tab-content hidden">
+                        <div class="mb-4">
+                            <button id="addContactToOrgBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                                <i class="fas fa-plus mr-2"></i>Add Contact
+                            </button>
+                        </div>
+                        <div id="orgContactsList">
+                            <!-- Contacts will be listed here -->
+                        </div>
+                    </div>
+
+                    <!-- Deals Tab -->
+                    <div id="dealsTab" class="tab-content hidden">
+                        <div class="mb-4">
+                            <button id="addDealToOrgBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                                <i class="fas fa-plus mr-2"></i>Add Deal
+                            </button>
+                        </div>
+                        <div id="orgDealsList">
+                            <!-- Deals will be listed here -->
+                        </div>
+                    </div>
+
+                    <!-- Activities Tab -->
+                    <div id="activitiesTab" class="tab-content hidden">
+                        <div class="mb-4">
+                            <button id="addActivityToOrgBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                                <i class="fas fa-plus mr-2"></i>Log Activity
+                            </button>
+                        </div>
+                        <div id="orgActivitiesList" class="activity-timeline relative pl-8">
+                            <!-- Activities will be listed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Modal -->
+    <div id="contactModal" class="fixed inset-0 z-50 modal-overlay hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-2xl w-full">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800">Contact Details</h3>
+                        <button class="text-gray-600 hover:text-gray-800" onclick="closeModal('contactModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <form id="contactForm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Organization</label>
+                                <select id="contactOrg" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                                    <option value="">Select Organization</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                                <input type="text" id="contactName" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                                <input type="text" id="contactRole" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                <input type="email" id="contactEmail" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                                <input type="tel" id="contactPhone" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                                <textarea id="contactNotes" rows="3" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500"></textarea>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="contactConsent" class="mr-2">
+                                    <span class="text-sm text-gray-700">Marketing consent</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end space-x-4">
+                            <button type="button" onclick="closeModal('contactModal')" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deal Modal -->
+    <div id="dealModal" class="fixed inset-0 z-50 modal-overlay hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-2xl w-full">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800">Deal Details</h3>
+                        <button class="text-gray-600 hover:text-gray-800" onclick="closeModal('dealModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <form id="dealForm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Organization *</label>
+                                <select id="dealOrg" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                                    <option value="">Select Organization</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Contact</label>
+                                <select id="dealContact" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                    <option value="">Select Contact</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+                                <input type="text" id="dealTitle" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Value</label>
+                                <input type="number" id="dealValue" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Stage</label>
+                                <select id="dealStage" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Probability (%)</label>
+                                <input type="number" id="dealProbability" min="0" max="100" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Expected Close Date</label>
+                                <input type="date" id="dealCloseDate" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Source</label>
+                                <select id="dealSource" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                    <option value="">Select Source</option>
+                                    <option value="Website">Website</option>
+                                    <option value="Referral">Referral</option>
+                                    <option value="Cold Call">Cold Call</option>
+                                    <option value="Social Media">Social Media</option>
+                                    <option value="Trade Show">Trade Show</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                                <textarea id="dealNotes" rows="3" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500"></textarea>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end space-x-4">
+                            <button type="button" onclick="closeModal('dealModal')" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Modal -->
+    <div id="activityModal" class="fixed inset-0 z-50 modal-overlay hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-2xl w-full">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800">Log Activity</h3>
+                        <button class="text-gray-600 hover:text-gray-800" onclick="closeModal('activityModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <form id="activityForm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Organization *</label>
+                                <select id="activityOrg" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                                    <option value="">Select Organization</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Contact</label>
+                                <select id="activityContact" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                    <option value="">Select Contact</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Type *</label>
+                                <select id="activityType" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                                    <option value="">Select Type</option>
+                                    <option value="Call">Call</option>
+                                    <option value="Email">Email</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Note">Note</option>
+                                    <option value="Task">Task</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Direction</label>
+                                <select id="activityDirection" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                    <option value="">Select Direction</option>
+                                    <option value="Inbound">Inbound</option>
+                                    <option value="Outbound">Outbound</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Date & Time *</label>
+                                <input type="datetime-local" id="activityDateTime" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Next Action Date</label>
+                                <input type="date" id="activityNextAction" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Summary *</label>
+                                <textarea id="activitySummary" rows="4" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500" required></textarea>
+                            </div>
+                            <div>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="activityCompleted" class="mr-2">
+                                    <span class="text-sm text-gray-700">Completed</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end space-x-4">
+                            <button type="button" onclick="closeModal('activityModal')" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="fixed inset-0 z-50 modal-overlay hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-3xl w-full">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800">Import CSV Data</h3>
+                        <button class="text-gray-600 hover:text-gray-800" onclick="closeModal('importModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Import Type</label>
+                        <select id="importType" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                            <option value="organizations">Organizations</option>
+                            <option value="contacts">Contacts</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">CSV File</label>
+                        <input type="file" id="csvFile" accept=".csv" class="w-full border rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div id="csvPreview" class="hidden">
+                        <h4 class="text-md font-semibold text-gray-800 mb-4">Preview & Column Mapping</h4>
+                        <div class="overflow-x-auto max-h-96 border rounded">
+                            <table id="previewTable" class="w-full text-sm">
+                                <!-- Preview will be inserted here -->
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end space-x-4">
+                        <button type="button" onclick="closeModal('importModal')" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                        <button id="processImportBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition" disabled>Import Data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Add Modal -->
+    <div id="quickAddModal" class="fixed inset-0 z-50 modal-overlay hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-md w-full">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800">Quick Add</h3>
+                        <button class="text-gray-600 hover:text-gray-800" onclick="closeModal('quickAddModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        <button class="p-4 border rounded-lg hover:bg-gray-50 transition text-center" onclick="showModal('organizationModal'); closeModal('quickAddModal');">
+                            <i class="fas fa-building text-2xl text-blue-600 mb-2"></i>
+                            <div class="font-medium">Organization</div>
+                        </button>
+                        <button class="p-4 border rounded-lg hover:bg-gray-50 transition text-center" onclick="showModal('contactModal'); closeModal('quickAddModal');">
+                            <i class="fas fa-user text-2xl text-green-600 mb-2"></i>
+                            <div class="font-medium">Contact</div>
+                        </button>
+                        <button class="p-4 border rounded-lg hover:bg-gray-50 transition text-center" onclick="showModal('dealModal'); closeModal('quickAddModal');">
+                            <i class="fas fa-handshake text-2xl text-yellow-600 mb-2"></i>
+                            <div class="font-medium">Deal</div>
+                        </button>
+                        <button class="p-4 border rounded-lg hover:bg-gray-50 transition text-center" onclick="showModal('activityModal'); closeModal('quickAddModal');">
+                            <i class="fas fa-calendar text-2xl text-purple-600 mb-2"></i>
+                            <div class="font-medium">Activity</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input for imports -->
+    <input type="file" id="hiddenFileInput" style="display: none;" accept=".csv,.json">
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let currentView = 'dashboard';
+        let currentOrgId = null;
+        let db = null;
+        let charts = {};
+
+        // Configuration
+        const INDUSTRIES = [
+            'Technology', 'Healthcare', 'Finance', 'Real Estate', 'Manufacturing',
+            'Retail', 'Education', 'Hospitality', 'Consulting', 'Media',
+            'Transportation', 'Energy', 'Non-profit', 'Government', 'Other'
+        ];
+
+        const PIPELINE_STAGES = [
+            'To Contact', 'Contacted', 'Follow-Up', 'Proposal Sent',
+            'Negotiation', 'Closed Won', 'Closed Lost'
+        ];
+
+        const ACTIVITY_TYPES = ['Call', 'Email', 'Meeting', 'Note', 'Task'];
+
+        // IndexedDB Database Setup
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('CRMDatabase', 1);
+
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+
+                    // Organizations store
+                    if (!db.objectStoreNames.contains('organizations')) {
+                        const orgStore = db.createObjectStore('organizations', { keyPath: 'id', autoIncrement: true });
+                        orgStore.createIndex('name', 'name', { unique: false });
+                        orgStore.createIndex('industry', 'industry', { unique: false });
+                        orgStore.createIndex('country', 'country', { unique: false });
+                        orgStore.createIndex('status', 'status', { unique: false });
+                    }
+
+                    // Contacts store
+                    if (!db.objectStoreNames.contains('contacts')) {
+                        const contactStore = db.createObjectStore('contacts', { keyPath: 'id', autoIncrement: true });
+                        contactStore.createIndex('organizationId', 'organizationId', { unique: false });
+                        contactStore.createIndex('email', 'email', { unique: false });
+                    }
+
+                    // Deals store
+                    if (!db.objectStoreNames.contains('deals')) {
+                        const dealStore = db.createObjectStore('deals', { keyPath: 'id', autoIncrement: true });
+                        dealStore.createIndex('organizationId', 'organizationId', { unique: false });
+                        dealStore.createIndex('stage', 'stage', { unique: false });
+                        dealStore.createIndex('owner', 'owner', { unique: false });
+                    }
+
+                    // Activities store
+                    if (!db.objectStoreNames.contains('activities')) {
+                        const activityStore = db.createObjectStore('activities', { keyPath: 'id', autoIncrement: true });
+                        activityStore.createIndex('organizationId', 'organizationId', { unique: false });
+                        activityStore.createIndex('contactId', 'contactId', { unique: false });
+                        activityStore.createIndex('type', 'type', { unique: false });
+                        activityStore.createIndex('date', 'date', { unique: false });
+                    }
+
+                    // Users store
+                    if (!db.objectStoreNames.contains('users')) {
+                        const userStore = db.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
+                        userStore.createIndex('email', 'email', { unique: true });
+                    }
+                };
+            });
+        }
+
+        // Database operations
+        async function saveToStore(storeName, data) {
+            const transaction = db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            
+            if (data.id) {
+                return store.put(data);
+            } else {
+                return store.add(data);
+            }
+        }
+
+        async function getFromStore(storeName, key = null) {
+            const transaction = db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            
+            if (key) {
+                return new Promise((resolve, reject) => {
+                    const request = store.get(key);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            } else {
+                return new Promise((resolve, reject) => {
+                    const request = store.getAll();
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+        }
+
+        async function deleteFromStore(storeName, key) {
+            const transaction = db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            return store.delete(key);
+        }
+
+        async function getFromIndex(storeName, indexName, value) {
+            const transaction = db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const index = store.index(indexName);
+            
+            return new Promise((resolve, reject) => {
+                const request = index.getAll(value);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Authentication
+        function login(email, role) {
+            currentUser = {
+                id: 1,
+                email: email,
+                role: role,
+                name: email.split('@')[0]
+            };
+            
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            document.getElementById('authModal').classList.add('hidden');
+            document.getElementById('userInfo').textContent = `${currentUser.name} (${role})`;
+            
+            init();
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            document.getElementById('authModal').classList.remove('hidden');
+        }
+
+        // Demo data generation
+        async function loadDemoData() {
+            // Demo organizations
+            const demoOrganizations = [
+                { name: 'TechCorp Solutions', industry: 'Technology', country: 'USA', city: 'San Francisco', website: 'https://techcorp.com', size: 'Large', status: 'Active', tags: ['enterprise', 'tech'], createdDate: new Date('2024-01-15') },
+                { name: 'Global Healthcare Inc', industry: 'Healthcare', country: 'Canada', city: 'Toronto', website: 'https://globalhc.com', size: 'Large', status: 'Active', tags: ['healthcare', 'international'], createdDate: new Date('2024-02-01') },
+                { name: 'Green Energy Solutions', industry: 'Energy', country: 'Germany', city: 'Berlin', website: 'https://greenenergy.de', size: 'Medium', status: 'Prospect', tags: ['renewable', 'sustainability'], createdDate: new Date('2024-02-15') },
+                { name: 'Downtown Real Estate', industry: 'Real Estate', country: 'USA', city: 'New York', website: 'https://downtownre.com', size: 'Medium', status: 'Active', tags: ['commercial', 'luxury'], createdDate: new Date('2024-01-30') },
+                { name: 'Artisan Coffee Co', industry: 'Retail', country: 'USA', city: 'Seattle', website: 'https://artisancoffee.com', size: 'Small', status: 'Prospect', tags: ['local', 'organic'], createdDate: new Date('2024-03-01') },
+                { name: 'Smart Manufacturing Ltd', industry: 'Manufacturing', country: 'Japan', city: 'Tokyo', website: 'https://smartmfg.jp', size: 'Large', status: 'Active', tags: ['automation', 'IoT'], createdDate: new Date('2024-01-20') },
+                { name: 'Digital Marketing Agency', industry: 'Media', country: 'UK', city: 'London', website: 'https://digitalmark.co.uk', size: 'Medium', status: 'Active', tags: ['digital', 'creative'], createdDate: new Date('2024-02-10') },
+                { name: 'EduTech Institute', industry: 'Education', country: 'Australia', city: 'Sydney', website: 'https://edutech.edu.au', size: 'Medium', status: 'Prospect', tags: ['education', 'online'], createdDate: new Date('2024-02-25') },
+                { name: 'Boutique Hotel Group', industry: 'Hospitality', country: 'France', city: 'Paris', website: 'https://boutiquehotels.fr', size: 'Small', status: 'Active', tags: ['luxury', 'boutique'], createdDate: new Date('2024-01-10') },
+                { name: 'Fintech Innovations', industry: 'Finance', country: 'Singapore', city: 'Singapore', website: 'https://fintechinno.sg', size: 'Medium', status: 'Prospect', tags: ['fintech', 'blockchain'], createdDate: new Date('2024-03-05') }
+            ];
+
+            // Save organizations and get their IDs
+            const savedOrgs = [];
+            for (let org of demoOrganizations) {
+                const result = await saveToStore('organizations', org);
+                savedOrgs.push({ ...org, id: result.target.result });
+            }
+
+            // Demo contacts
+            const demoContacts = [
+                { organizationId: savedOrgs[0].id, fullName: 'John Smith', role: 'CEO', email: 'john@techcorp.com', phone: '+1-555-0101', consentMarketing: true, notes: 'Key decision maker' },
+                { organizationId: savedOrgs[0].id, fullName: 'Sarah Johnson', role: 'CTO', email: 'sarah@techcorp.com', phone: '+1-555-0102', consentMarketing: true, notes: 'Technical contact' },
+                { organizationId: savedOrgs[1].id, fullName: 'Dr. Michael Brown', role: 'Medical Director', email: 'mbrown@globalhc.com', phone: '+1-416-555-0103', consentMarketing: true, notes: 'Healthcare expert' },
+                { organizationId: savedOrgs[2].id, fullName: 'Hans Mueller', role: 'Sustainability Officer', email: 'h.mueller@greenenergy.de', phone: '+49-30-555-0104', consentMarketing: false, notes: 'Environmental focus' },
+                { organizationId: savedOrgs[3].id, fullName: 'Emma Davis', role: 'Property Manager', email: 'emma@downtownre.com', phone: '+1-212-555-0105', consentMarketing: true, notes: 'Commercial properties' }
+            ];
+
+            for (let contact of demoContacts) {
+                await saveToStore('contacts', contact);
+            }
+
+            // Demo deals
+            const demoDeals = [
+                { organizationId: savedOrgs[0].id, title: 'Enterprise Software License', value: 250000, stage: 'Negotiation', probability: 75, expectedCloseDate: '2024-04-15', source: 'Referral', owner: 'admin@crm.com', createdDate: new Date('2024-03-01') },
+                { organizationId: savedOrgs[1].id, title: 'Healthcare Management System', value: 150000, stage: 'Proposal Sent', probability: 60, expectedCloseDate: '2024-05-01', source: 'Website', owner: 'admin@crm.com', createdDate: new Date('2024-02-15') },
+                { organizationId: savedOrgs[2].id, title: 'Solar Panel Installation', value: 80000, stage: 'Follow-Up', probability: 40, expectedCloseDate: '2024-06-01', source: 'Trade Show', owner: 'admin@crm.com', createdDate: new Date('2024-03-10') },
+                { organizationId: savedOrgs[3].id, title: 'Office Space Lease', value: 300000, stage: 'Closed Won', probability: 100, expectedCloseDate: '2024-03-20', source: 'Referral', owner: 'admin@crm.com', createdDate: new Date('2024-02-01') },
+                { organizationId: savedOrgs[4].id, title: 'Coffee Supply Contract', value: 25000, stage: 'To Contact', probability: 20, expectedCloseDate: '2024-07-01', source: 'Cold Call', owner: 'admin@crm.com', createdDate: new Date('2024-03-15') }
+            ];
+
+            for (let deal of demoDeals) {
+                await saveToStore('deals', deal);
+            }
+
+            // Demo activities
+            const demoActivities = [
+                { organizationId: savedOrgs[0].id, type: 'Call', direction: 'Outbound', date: new Date('2024-03-20'), summary: 'Initial discovery call with John Smith', completed: true, owner: 'admin@crm.com' },
+                { organizationId: savedOrgs[0].id, type: 'Meeting', date: new Date('2024-03-22'), summary: 'Product demo scheduled for next week', completed: false, nextActionDate: new Date('2024-03-29'), owner: 'admin@crm.com' },
+                { organizationId: savedOrgs[1].id, type: 'Email', direction: 'Outbound', date: new Date('2024-03-18'), summary: 'Sent proposal for healthcare management system', completed: true, owner: 'admin@crm.com' },
+                { organizationId: savedOrgs[2].id, type: 'Call', direction: 'Inbound', date: new Date('2024-03-19'), summary: 'Hans called to discuss sustainability requirements', completed: true, owner: 'admin@crm.com' },
+                { organizationId: savedOrgs[3].id, type: 'Meeting', date: new Date('2024-03-16'), summary: 'Contract signing meeting - deal closed!', completed: true, owner: 'admin@crm.com' }
+            ];
+
+            for (let activity of demoActivities) {
+                await saveToStore('activities', activity);
+            }
+
+            // Refresh current view
+            await refreshCurrentView();
+            showNotification('Demo data loaded successfully!', 'success');
+        }
+
+        // UI Functions
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+            
+            // Reset form if it exists
+            const modal = document.getElementById(modalId);
+            const form = modal.querySelector('form');
+            if (form) {
+                form.reset();
+            }
+            
+            // Clear current org id for new items
+            if (modalId !== 'organizationModal') {
+                currentOrgId = null;
+            }
+            
+            // Populate dropdowns based on modal type
+            if (modalId === 'contactModal' || modalId === 'dealModal' || modalId === 'activityModal') {
+                populateOrganizationDropdowns();
+            }
+            
+            if (modalId === 'dealModal') {
+                populateStageDropdown();
+            }
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            currentOrgId = null;
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-white ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                'bg-blue-500'
+            }`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 3000);
+        }
+
+        async function populateOrganizationDropdowns() {
+            const organizations = await getFromStore('organizations');
+            const selects = ['contactOrg', 'dealOrg', 'activityOrg'];
+            
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (select) {
+                    // Keep the first option (Select Organization)
+                    select.innerHTML = '<option value="">Select Organization</option>';
+                    
+                    organizations.forEach(org => {
+                        const option = document.createElement('option');
+                        option.value = org.id;
+                        option.textContent = org.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        }
+
+        function populateStageDropdown() {
+            const select = document.getElementById('dealStage');
+            if (select) {
+                select.innerHTML = '';
+                PIPELINE_STAGES.forEach(stage => {
+                    const option = document.createElement('option');
+                    option.value = stage;
+                    option.textContent = stage;
+                    select.appendChild(option);
+                });
+            }
+        }
+
+        function populateIndustryDropdowns() {
+            const selects = ['industryFilter', 'orgIndustry'];
+            
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (select) {
+                    if (selectId === 'industryFilter') {
+                        select.innerHTML = '<option value="">All Industries</option>';
+                    } else {
+                        select.innerHTML = '<option value="">Select Industry</option>';
+                    }
+                    
+                    INDUSTRIES.forEach(industry => {
+                        const option = document.createElement('option');
+                        option.value = industry;
+                        option.textContent = industry;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        }
+
+        // Navigation
+        function switchView(viewName) {
+            // Hide all views
+            document.querySelectorAll('.view-content').forEach(view => {
+                view.classList.add('hidden');
+            });
+            
+            // Show selected view
+            document.getElementById(viewName + 'View').classList.remove('hidden');
+            
+            // Update navigation
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('bg-blue-50', 'text-blue-600');
+            });
+            
+            document.querySelector(`[data-view="${viewName}"]`).classList.add('bg-blue-50', 'text-blue-600');
+            
+            currentView = viewName;
+            
+            // Load view data
+            switch (viewName) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'organizations':
+                    loadOrganizations();
+                    break;
+                case 'contacts':
+                    loadContacts();
+                    break;
+                case 'pipeline':
+                    loadPipeline();
+                    break;
+                case 'activities':
+                    loadActivities();
+                    break;
+                case 'settings':
+                    loadSettings();
+                    break;
+            }
+        }
+
+        async function refreshCurrentView() {
+            switchView(currentView);
+        }
+
+        // Dashboard
+        async function loadDashboard() {
+            const organizations = await getFromStore('organizations');
+            const deals = await getFromStore('deals');
+            const activities = await getFromStore('activities');
+            
+            // Update stats cards
+            document.getElementById('totalOrganizations').textContent = organizations.length;
+            
+            const activeDeals = deals.filter(deal => 
+                !['Closed Won', 'Closed Lost'].includes(deal.stage)
+            );
+            document.getElementById('activeDeals').textContent = activeDeals.length;
+            
+            const pipelineValue = activeDeals.reduce((sum, deal) => sum + (deal.value || 0), 0);
+            document.getElementById('pipelineValue').textContent = `$${pipelineValue.toLocaleString()}`;
+            
+            const wonDeals = deals.filter(deal => deal.stage === 'Closed Won');
+            const totalDeals = deals.filter(deal => ['Closed Won', 'Closed Lost'].includes(deal.stage));
+            const winRate = totalDeals.length > 0 ? ((wonDeals.length / totalDeals.length) * 100).toFixed(1) : 0;
+            document.getElementById('winRate').textContent = `${winRate}%`;
+            
+            // Load charts
+            loadCharts(deals, activities);
+        }
+
+        function loadCharts(deals, activities) {
+            // Pipeline Funnel Chart
+            const pipelineCtx = document.getElementById('pipelineChart').getContext('2d');
+            const stageCounts = PIPELINE_STAGES.map(stage => 
+                deals.filter(deal => deal.stage === stage).length
+            );
+            
+            if (charts.pipeline) charts.pipeline.destroy();
+            charts.pipeline = new Chart(pipelineCtx, {
+                type: 'bar',
+                data: {
+                    labels: PIPELINE_STAGES,
+                    datasets: [{
+                        label: 'Deals by Stage',
+                        data: stageCounts,
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+            
+            // Revenue Chart (monthly mock data)
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            if (charts.revenue) charts.revenue.destroy();
+            charts.revenue = new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Monthly Revenue',
+                        data: [45000, 52000, 48000, 61000, 55000, 67000],
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Activities Chart
+            const activitiesCtx = document.getElementById('activitiesChart').getContext('2d');
+            const activityCounts = ACTIVITY_TYPES.map(type => 
+                activities.filter(activity => activity.type === type).length
+            );
+            
+            if (charts.activities) charts.activities.destroy();
+            charts.activities = new Chart(activitiesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ACTIVITY_TYPES,
+                    datasets: [{
+                        data: activityCounts,
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(34, 197, 94, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(147, 51, 234, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // Sources Chart
+            const sourcesCtx = document.getElementById('sourcesChart').getContext('2d');
+            const sources = ['Website', 'Referral', 'Cold Call', 'Social Media', 'Trade Show'];
+            const sourceCounts = sources.map(source => 
+                deals.filter(deal => deal.source === source).length
+            );
+            
+            if (charts.sources) charts.sources.destroy();
+            charts.sources = new Chart(sourcesCtx, {
+                type: 'pie',
+                data: {
+                    labels: sources,
+                    datasets: [{
+                        data: sourceCounts,
+                        backgroundColor: [
+                            'rgba(99, 102, 241, 0.8)',
+                            'rgba(236, 72, 153, 0.8)',
+                            'rgba(14, 165, 233, 0.8)',
+                            'rgba(168, 85, 247, 0.8)',
+                            'rgba(34, 197, 94, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        // Organizations
+        async function loadOrganizations() {
+            const organizations = await getFromStore('organizations');
+            populateFilters(organizations);
+            displayOrganizations(organizations);
+        }
+
+        function populateFilters(organizations) {
+            // Populate industry filter
+            const industries = [...new Set(organizations.map(org => org.industry).filter(Boolean))];
+            const industrySelect = document.getElementById('industryFilter');
+            industrySelect.innerHTML = '<option value="">All Industries</option>';
+            industries.forEach(industry => {
+                const option = document.createElement('option');
+                option.value = industry;
+                option.textContent = industry;
+                industrySelect.appendChild(option);
+            });
+            
+            // Populate country filter
+            const countries = [...new Set(organizations.map(org => org.country).filter(Boolean))];
+            const countrySelect = document.getElementById('countryFilter');
+            countrySelect.innerHTML = '<option value="">All Countries</option>';
+            countries.forEach(country => {
+                const option = document.createElement('option');
+                option.value = country;
+                option.textContent = country;
+                countrySelect.appendChild(option);
+            });
+        }
+
+        async function displayOrganizations(filteredOrgs = null) {
+            const organizations = filteredOrgs || await getFromStore('organizations');
+            const contacts = await getFromStore('contacts');
+            const deals = await getFromStore('deals');
+            const activities = await getFromStore('activities');
+            
+            const tbody = document.getElementById('organizationsTable');
+            tbody.innerHTML = '';
+            
+            organizations.forEach(org => {
+                const orgContacts = contacts.filter(c => c.organizationId === org.id);
+                const orgDeals = deals.filter(d => d.organizationId === org.id);
+                const orgActivities = activities.filter(a => a.organizationId === org.id);
+                
+                const lastActivity = orgActivities.length > 0 ? 
+                    new Date(Math.max(...orgActivities.map(a => new Date(a.date)))).toLocaleDateString() : 
+                    'Never';
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-6 py-4">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-building text-blue-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${org.name}</div>
+                                <div class="text-sm text-gray-500">${org.website || ''}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${org.industry || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${org.city || ''}, ${org.country || ''}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${orgContacts.length}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${orgDeals.length}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${lastActivity}</td>
+                    <td class="px-6 py-4 text-sm font-medium space-x-2">
+                        <button onclick="editOrganization(${org.id})" class="text-blue-600 hover:text-blue-900">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteOrganization(${org.id})" class="text-red-600 hover:text-red-900">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function editOrganization(id) {
+            const org = await getFromStore('organizations', id);
+            if (!org) return;
+            
+            currentOrgId = id;
+            
+            // Populate form
+            document.getElementById('orgName').value = org.name || '';
+            document.getElementById('orgIndustry').value = org.industry || '';
+            document.getElementById('orgCountry').value = org.country || '';
+            document.getElementById('orgCity').value = org.city || '';
+            document.getElementById('orgWebsite').value = org.website || '';
+            document.getElementById('orgSize').value = org.size || '';
+            document.getElementById('orgStatus').value = org.status || 'Prospect';
+            document.getElementById('orgTags').value = Array.isArray(org.tags) ? org.tags.join(', ') : (org.tags || '');
+            
+            // Load related data
+            await loadOrganizationTabs(id);
+            
+            document.getElementById('orgModalTitle').textContent = 'Edit Organization';
+            showModal('organizationModal');
+        }
+
+        async function loadOrganizationTabs(orgId) {
+            const contacts = await getFromIndex('contacts', 'organizationId', orgId);
+            const deals = await getFromIndex('deals', 'organizationId', orgId);
+            const activities = await getFromIndex('activities', 'organizationId', orgId);
+            
+            // Update tab counts
+            document.getElementById('contactsCount').textContent = contacts.length;
+            document.getElementById('dealsCount').textContent = deals.length;
+            document.getElementById('activitiesCount').textContent = activities.length;
+            
+            // Load contacts tab
+            const contactsList = document.getElementById('orgContactsList');
+            contactsList.innerHTML = '';
+            contacts.forEach(contact => {
+                const contactDiv = document.createElement('div');
+                contactDiv.className = 'border rounded p-4 mb-2';
+                contactDiv.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-medium">${contact.fullName}</h4>
+                            <p class="text-sm text-gray-600">${contact.role || 'No role specified'}</p>
+                            <p class="text-sm text-gray-600">${contact.email || 'No email'}</p>
+                            <p class="text-sm text-gray-600">${contact.phone || 'No phone'}</p>
+                        </div>
+                        <div class="space-x-2">
+                            <button onclick="editContact(${contact.id})" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteContact(${contact.id})" class="text-red-600 hover:text-red-800">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                contactsList.appendChild(contactDiv);
+            });
+            
+            // Load deals tab
+            const dealsList = document.getElementById('orgDealsList');
+            dealsList.innerHTML = '';
+            deals.forEach(deal => {
+                const dealDiv = document.createElement('div');
+                dealDiv.className = 'border rounded p-4 mb-2';
+                dealDiv.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-medium">${deal.title}</h4>
+                            <p class="text-sm text-gray-600">Value: $${(deal.value || 0).toLocaleString()}</p>
+                            <p class="text-sm text-gray-600">Stage: ${deal.stage}</p>
+                            <p class="text-sm text-gray-600">Probability: ${deal.probability || 0}%</p>
+                        </div>
+                        <div class="space-x-2">
+                            <button onclick="editDeal(${deal.id})" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteDeal(${deal.id})" class="text-red-600 hover:text-red-800">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                dealsList.appendChild(dealDiv);
+            });
+            
+            // Load activities tab
+            const activitiesList = document.getElementById('orgActivitiesList');
+            activitiesList.innerHTML = '';
+            activities.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(activity => {
+                const activityDiv = document.createElement('div');
+                activityDiv.className = 'activity-item pl-6 pb-4';
+                activityDiv.innerHTML = `
+                    <div class="bg-white border rounded p-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <span class="font-medium text-sm">${activity.type}</span>
+                                    ${activity.direction ? `<span class="text-xs bg-gray-100 px-2 py-1 rounded">${activity.direction}</span>` : ''}
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">${activity.summary}</p>
+                                <p class="text-xs text-gray-400">${new Date(activity.date).toLocaleString()}</p>
+                            </div>
+                            <button onclick="deleteActivity(${activity.id})" class="text-red-600 hover:text-red-800">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                activitiesList.appendChild(activityDiv);
+            });
+        }
+
+        async function deleteOrganization(id) {
+            if (confirm('Are you sure you want to delete this organization? This will also delete all related contacts, deals, and activities.')) {
+                // Delete related records
+                const contacts = await getFromIndex('contacts', 'organizationId', id);
+                const deals = await getFromIndex('deals', 'organizationId', id);
+                const activities = await getFromIndex('activities', 'organizationId', id);
+                
+                for (let contact of contacts) {
+                    await deleteFromStore('contacts', contact.id);
+                }
+                for (let deal of deals) {
+                    await deleteFromStore('deals', deal.id);
+                }
+                for (let activity of activities) {
+                    await deleteFromStore('activities', activity.id);
+                }
+                
+                // Delete organization
+                await deleteFromStore('organizations', id);
+                
+                await loadOrganizations();
+                showNotification('Organization deleted successfully', 'success');
+            }
+        }
+
+        // Contacts
+        async function loadContacts() {
+            const contacts = await getFromStore('contacts');
+            const organizations = await getFromStore('organizations');
+            
+            const tbody = document.getElementById('contactsTable');
+            tbody.innerHTML = '';
+            
+            contacts.forEach(contact => {
+                const org = organizations.find(o => o.id === contact.organizationId);
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-6 py-4">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-green-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${contact.fullName}</div>
+                                <div class="text-sm text-gray-500">${contact.role || 'No role specified'}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${org ? org.name : 'Unknown'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${contact.role || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${contact.email || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${contact.phone || '-'}</td>
+                    <td class="px-6 py-4 text-sm font-medium space-x-2">
+                        <button onclick="editContact(${contact.id})" class="text-blue-600 hover:text-blue-900">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteContact(${contact.id})" class="text-red-600 hover:text-red-900">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function editContact(id) {
+            const contact = await getFromStore('contacts', id);
+            if (!contact) return;
+            
+            await populateOrganizationDropdowns();
+            
+            // Populate form
+            document.getElementById('contactOrg').value = contact.organizationId || '';
+            document.getElementById('contactName').value = contact.fullName || '';
+            document.getElementById('contactRole').value = contact.role || '';
+            document.getElementById('contactEmail').value = contact.email || '';
+            document.getElementById('contactPhone').value = contact.phone || '';
+            document.getElementById('contactNotes').value = contact.notes || '';
+            document.getElementById('contactConsent').checked = contact.consentMarketing || false;
+            
+            // Store ID for update
+            document.getElementById('contactForm').dataset.contactId = id;
+            
+            showModal('contactModal');
+        }
+
+        async function deleteContact(id) {
+            if (confirm('Are you sure you want to delete this contact?')) {
+                await deleteFromStore('contacts', id);
+                await refreshCurrentView();
+                showNotification('Contact deleted successfully', 'success');
+            }
+        }
+
+        // Pipeline
+        async function loadPipeline() {
+            const deals = await getFromStore('deals');
+            const organizations = await getFromStore('organizations');
+            
+            // Populate owner filter
+            const owners = [...new Set(deals.map(deal => deal.owner).filter(Boolean))];
+            const ownerSelect = document.getElementById('pipelineOwnerFilter');
+            ownerSelect.innerHTML = '<option value="">All Owners</option>';
+            owners.forEach(owner => {
+                const option = document.createElement('option');
+                option.value = owner;
+                option.textContent = owner;
+                ownerSelect.appendChild(option);
+            });
+            
+            displayPipeline(deals, organizations);
+        }
+
+        function displayPipeline(deals, organizations) {
+            const kanban = document.getElementById('pipelineKanban');
+            kanban.innerHTML = '';
+            
+            PIPELINE_STAGES.forEach(stage => {
+                const stageDeals = deals.filter(deal => deal.stage === stage);
+                
+                const stageColumn = document.createElement('div');
+                stageColumn.className = 'bg-gray-100 rounded-lg p-4';
+                stageColumn.innerHTML = `
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-800">${stage}</h3>
+                        <span class="bg-white text-gray-600 px-2 py-1 rounded-full text-sm">${stageDeals.length}</span>
+                    </div>
+                    <div class="deal-cards space-y-3" data-stage="${stage}">
+                        ${stageDeals.map(deal => {
+                            const org = organizations.find(o => o.id === deal.organizationId);
+                            return `
+                                <div class="deal-card bg-white p-4 rounded-lg shadow-sm border" data-deal-id="${deal.id}">
+                                    <h4 class="font-medium text-gray-900 mb-2">${deal.title}</h4>
+                                    <p class="text-sm text-gray-600 mb-2">${org ? org.name : 'Unknown Org'}</p>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-semibold text-green-600">$${(deal.value || 0).toLocaleString()}</span>
+                                        <span class="text-xs text-gray-500">${deal.probability || 0}%</span>
+                                    </div>
+                                    <div class="mt-2 flex justify-end space-x-1">
+                                        <button onclick="editDeal(${deal.id})" class="text-blue-600 hover:text-blue-800 text-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button onclick="deleteDeal(${deal.id})" class="text-red-600 hover:text-red-800 text-sm">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+                kanban.appendChild(stageColumn);
+                
+                // Make cards sortable
+                const cardContainer = stageColumn.querySelector('.deal-cards');
+                Sortable.create(cardContainer, {
+                    group: 'deals',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    onEnd: async function(evt) {
+                        const dealId = parseInt(evt.item.dataset.dealId);
+                        const newStage = evt.to.dataset.stage;
+                        
+                        // Update deal stage in database
+                        const deal = await getFromStore('deals', dealId);
+                        if (deal) {
+                            deal.stage = newStage;
+                            await saveToStore('deals', deal);
+                            showNotification(`Deal moved to ${newStage}`, 'success');
+                        }
+                    }
+                });
+            });
+        }
+
+        async function editDeal(id) {
+            const deal = await getFromStore('deals', id);
+            if (!deal) return;
+            
+            await populateOrganizationDropdowns();
+            populateStageDropdown();
+            
+            // Populate form
+            document.getElementById('dealOrg').value = deal.organizationId || '';
+            document.getElementById('dealContact').value = deal.contactId || '';
+            document.getElementById('dealTitle').value = deal.title || '';
+            document.getElementById('dealValue').value = deal.value || '';
+            document.getElementById('dealStage').value = deal.stage || '';
+            document.getElementById('dealProbability').value = deal.probability || '';
+            document.getElementById('dealCloseDate').value = deal.expectedCloseDate ? deal.expectedCloseDate.split('T')[0] : '';
+            document.getElementById('dealSource').value = deal.source || '';
+            document.getElementById('dealNotes').value = deal.notes || '';
+            
+            // Store ID for update
+            document.getElementById('dealForm').dataset.dealId = id;
+            
+            showModal('dealModal');
+        }
+
+        async function deleteDeal(id) {
+            if (confirm('Are you sure you want to delete this deal?')) {
+                await deleteFromStore('deals', id);
+                await refreshCurrentView();
+                showNotification('Deal deleted successfully', 'success');
+            }
+        }
+
+        // Activities
+        async function loadActivities() {
+            const activities = await getFromStore('activities');
+            const organizations = await getFromStore('organizations');
+            const contacts = await getFromStore('contacts');
+            
+            // Load activities timeline
+            const timeline = document.getElementById('activitiesTimeline');
+            timeline.innerHTML = '';
+            
+            const sortedActivities = activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            sortedActivities.forEach(activity => {
+                const org = organizations.find(o => o.id === activity.organizationId);
+                const contact = contacts.find(c => c.id === activity.contactId);
+                
+                const activityDiv = document.createElement('div');
+                activityDiv.className = 'activity-item pl-6 pb-6';
+                activityDiv.innerHTML = `
+                    <div class="bg-white border rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <span class="font-medium">${activity.type}</span>
+                                    ${activity.direction ? `<span class="text-xs bg-gray-100 px-2 py-1 rounded">${activity.direction}</span>` : ''}
+                                    ${activity.completed ? '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Completed</span>' : '<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Pending</span>'}
+                                </div>
+                                <p class="text-gray-600 mb-2">${activity.summary}</p>
+                                <div class="text-sm text-gray-500">
+                                    <p><strong>Organization:</strong> ${org ? org.name : 'Unknown'}</p>
+                                    ${contact ? `<p><strong>Contact:</strong> ${contact.fullName}</p>` : ''}
+                                    <p><strong>Date:</strong> ${new Date(activity.date).toLocaleString()}</p>
+                                    ${activity.nextActionDate ? `<p><strong>Next Action:</strong> ${new Date(activity.nextActionDate).toLocaleDateString()}</p>` : ''}
+                                </div>
+                            </div>
+                            <div class="space-x-2">
+                                <button onclick="editActivity(${activity.id})" class="text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="deleteActivity(${activity.id})" class="text-red-600 hover:text-red-800">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                timeline.appendChild(activityDiv);
+            });
+            
+            // Load tasks
+            const tasksList = document.getElementById('tasksList');
+            tasksList.innerHTML = '';
+            
+            const tasks = activities.filter(activity => 
+                activity.type === 'Task' && !activity.completed
+            ).sort((a, b) => new Date(a.nextActionDate || a.date) - new Date(b.nextActionDate || b.date));
+            
+            tasks.forEach(task => {
+                const org = organizations.find(o => o.id === task.organizationId);
+                const dueDate = new Date(task.nextActionDate || task.date);
+                const isOverdue = dueDate < new Date();
+                
+                const taskDiv = document.createElement('div');
+                taskDiv.className = `border rounded-lg p-3 mb-3 ${isOverdue ? 'border-red-200 bg-red-50' : 'border-gray-200'}`;
+                taskDiv.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="font-medium text-sm">${task.summary}</p>
+                            <p class="text-xs text-gray-600">${org ? org.name : 'Unknown Org'}</p>
+                            <p class="text-xs ${isOverdue ? 'text-red-600' : 'text-gray-500'}">
+                                Due: ${dueDate.toLocaleDateString()}
+                            </p>
+                        </div>
+                        <button onclick="completeTask(${task.id})" class="text-green-600 hover:text-green-800">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </div>
+                `;
+                tasksList.appendChild(taskDiv);
+            });
+            
+            if (tasks.length === 0) {
+                tasksList.innerHTML = '<p class="text-gray-500 text-center py-4">No pending tasks</p>';
+            }
+        }
+
+        async function completeTask(id) {
+            const activity = await getFromStore('activities', id);
+            if (activity) {
+                activity.completed = true;
+                await saveToStore('activities', activity);
+                await loadActivities();
+                showNotification('Task completed!', 'success');
+            }
+        }
+
+        async function editActivity(id) {
+            const activity = await getFromStore('activities', id);
+            if (!activity) return;
+            
+            await populateOrganizationDropdowns();
+            
+            // Populate form
+            document.getElementById('activityOrg').value = activity.organizationId || '';
+            document.getElementById('activityContact').value = activity.contactId || '';
+            document.getElementById('activityType').value = activity.type || '';
+            document.getElementById('activityDirection').value = activity.direction || '';
+            
+            // Format datetime for input
+            if (activity.date) {
+                const date = new Date(activity.date);
+                document.getElementById('activityDateTime').value = date.toISOString().slice(0, 16);
+            }
+            
+            document.getElementById('activityNextAction').value = activity.nextActionDate ? 
+                new Date(activity.nextActionDate).toISOString().split('T')[0] : '';
+            document.getElementById('activitySummary').value = activity.summary || '';
+            document.getElementById('activityCompleted').checked = activity.completed || false;
+            
+            // Store ID for update
+            document.getElementById('activityForm').dataset.activityId = id;
+            
+            showModal('activityModal');
+        }
+
+        async function deleteActivity(id) {
+            if (confirm('Are you sure you want to delete this activity?')) {
+                await deleteFromStore('activities', id);
+                await refreshCurrentView();
+                showNotification('Activity deleted successfully', 'success');
+            }
+        }
+
+        // Settings
+        async function loadSettings() {
+            const stagesList = document.getElementById('stagesList');
+            stagesList.innerHTML = '';
+            
+            PIPELINE_STAGES.forEach((stage, index) => {
+                const stageDiv = document.createElement('div');
+                stageDiv.className = 'flex items-center justify-between p-3 border rounded mb-2';
+                stageDiv.innerHTML = `
+                    <span>${stage}</span>
+                    <div class="space-x-2">
+                        <button class="text-gray-600 hover:text-gray-800">
+                            <i class="fas fa-grip-vertical"></i>
+                        </button>
+                        <button onclick="editStage(${index})" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteStage(${index})" class="text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                stagesList.appendChild(stageDiv);
+            });
+        }
+
+        // Form submissions
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const role = document.getElementById('loginRole').value;
+            login(email, role);
+        });
+
+        document.getElementById('organizationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const orgData = {
+                name: document.getElementById('orgName').value,
+                industry: document.getElementById('orgIndustry').value,
+                country: document.getElementById('orgCountry').value,
+                city: document.getElementById('orgCity').value,
+                website: document.getElementById('orgWebsite').value,
+                size: document.getElementById('orgSize').value,
+                status: document.getElementById('orgStatus').value,
+                tags: document.getElementById('orgTags').value.split(',').map(tag => tag.trim()).filter(tag => tag),
+                createdDate: new Date()
+            };
+            
+            if (currentOrgId) {
+                orgData.id = currentOrgId;
+            }
+            
+            try {
+                await saveToStore('organizations', orgData);
+                closeModal('organizationModal');
+                await refreshCurrentView();
+                showNotification(currentOrgId ? 'Organization updated!' : 'Organization created!', 'success');
+                currentOrgId = null;
+            } catch (error) {
+                showNotification('Error saving organization', 'error');
+                console.error(error);
+            }
+        });
+
+        document.getElementById('contactForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const contactData = {
+                organizationId: parseInt(document.getElementById('contactOrg').value),
+                fullName: document.getElementById('contactName').value,
+                role: document.getElementById('contactRole').value,
+                email: document.getElementById('contactEmail').value,
+                phone: document.getElementById('contactPhone').value,
+                notes: document.getElementById('contactNotes').value,
+                consentMarketing: document.getElementById('contactConsent').checked,
+                createdDate: new Date()
+            };
+            
+            const contactId = this.dataset.contactId;
+            if (contactId) {
+                contactData.id = parseInt(contactId);
+            }
+            
+            try {
+                await saveToStore('contacts', contactData);
+                closeModal('contactModal');
+                await refreshCurrentView();
+                showNotification(contactId ? 'Contact updated!' : 'Contact created!', 'success');
+                this.removeAttribute('data-contact-id');
+            } catch (error) {
+                showNotification('Error saving contact', 'error');
+                console.error(error);
+            }
+        });
+
+        document.getElementById('dealForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const dealData = {
+                organizationId: parseInt(document.getElementById('dealOrg').value),
+                contactId: document.getElementById('dealContact').value ? parseInt(document.getElementById('dealContact').value) : null,
+                title: document.getElementById('dealTitle').value,
+                value: parseFloat(document.getElementById('dealValue').value) || 0,
+                stage: document.getElementById('dealStage').value,
+                probability: parseInt(document.getElementById('dealProbability').value) || 0,
+                expectedCloseDate: document.getElementById('dealCloseDate').value,
+                source: document.getElementById('dealSource').value,
+                notes: document.getElementById('dealNotes').value,
+                owner: currentUser.email,
+                createdDate: new Date()
+            };
+            
+            const dealId = this.dataset.dealId;
+            if (dealId) {
+                dealData.id = parseInt(dealId);
+            }
+            
+            try {
+                await saveToStore('deals', dealData);
+                closeModal('dealModal');
+                await refreshCurrentView();
+                showNotification(dealId ? 'Deal updated!' : 'Deal created!', 'success');
+                this.removeAttribute('data-deal-id');
+            } catch (error) {
+                showNotification('Error saving deal', 'error');
+                console.error(error);
+            }
+        });
+
+        document.getElementById('activityForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const activityData = {
+                organizationId: parseInt(document.getElementById('activityOrg').value),
+                contactId: document.getElementById('activityContact').value ? parseInt(document.getElementById('activityContact').value) : null,
+                type: document.getElementById('activityType').value,
+                direction: document.getElementById('activityDirection').value,
+                date: new Date(document.getElementById('activityDateTime').value),
+                nextActionDate: document.getElementById('activityNextAction').value ? new Date(document.getElementById('activityNextAction').value) : null,
+                summary: document.getElementById('activitySummary').value,
+                completed: document.getElementById('activityCompleted').checked,
+                owner: currentUser.email
+            };
+            
+            const activityId = this.dataset.activityId;
+            if (activityId) {
+                activityData.id = parseInt(activityId);
+            }
+            
+            try {
+                await saveToStore('activities', activityData);
+                closeModal('activityModal');
+                await refreshCurrentView();
+                showNotification(activityId ? 'Activity updated!' : 'Activity logged!', 'success');
+                this.removeAttribute('data-activity-id');
+            } catch (error) {
+                showNotification('Error saving activity', 'error');
+                console.error(error);
+            }
+        });
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Initialize database
+            await initDB();
+            
+            // Check for existing login
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                document.getElementById('authModal').classList.add('hidden');
+                document.getElementById('userInfo').textContent = `${currentUser.name} (${currentUser.role})`;
+                init();
+            }
+            
+            // Navigation
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const view = item.dataset.view;
+                    switchView(view);
+                });
+            });
+            
+            // Sidebar toggle
+            document.getElementById('sidebarToggle').addEventListener('click', () => {
+                const sidebar = document.getElementById('sidebar');
+                const mainContent = document.getElementById('mainContent');
+                
+                sidebar.classList.toggle('-translate-x-full');
+                if (window.innerWidth < 1024) {
+                    mainContent.classList.toggle('ml-0');
+                    mainContent.classList.toggle('ml-64');
+                }
+            });
+            
+            // Global search
+            document.getElementById('globalSearch').addEventListener('input', debounce(performGlobalSearch, 300));
+            
+            // Quick add
+            document.getElementById('quickAddBtn').addEventListener('click', () => showModal('quickAddModal'));
+            
+            // Logout
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            
+            // Demo data
+            document.getElementById('demoDataBtn').addEventListener('click', async () => {
+                await loadDemoData();
+                closeModal('authModal');
+                login('demo@crm.com', 'admin');
+            });
+            
+            // Filters
+            ['industryFilter', 'countryFilter', 'sizeFilter', 'statusFilter'].forEach(filterId => {
+                document.getElementById(filterId).addEventListener('change', filterOrganizations);
+            });
+            
+            document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters);
+            
+            // Organization modal tabs
+            document.querySelectorAll('.org-tab').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    const tabName = e.target.dataset.tab;
+                    switchOrgTab(tabName);
+                });
+            });
+            
+            // Modal buttons
+            document.getElementById('addOrgBtn').addEventListener('click', () => {
+                currentOrgId = null;
+                document.getElementById('orgModalTitle').textContent = 'Add Organization';
+                showModal('organizationModal');
+            });
+            
+            document.getElementById('addContactBtn').addEventListener('click', () => showModal('contactModal'));
+            document.getElementById('addDealBtn').addEventListener('click', () => showModal('dealModal'));
+            document.getElementById('addActivityBtn').addEventListener('click', () => showModal('activityModal'));
+            
+            // Import/Export
+            document.getElementById('importOrgsBtn').addEventListener('click', () => {
+                document.getElementById('importType').value = 'organizations';
+                showModal('importModal');
+            });
+            
+            document.getElementById('importContactsBtn').addEventListener('click', () => {
+                document.getElementById('importType').value = 'contacts';
+                showModal('importModal');
+            });
+            
+            document.getElementById('exportOrgsBtn').addEventListener('click', exportOrganizations);
+            
+            // CSV handling
+            document.getElementById('csvFile').addEventListener('change', handleCSVFile);
+            document.getElementById('processImportBtn').addEventListener('click', processCSVImport);
+            
+            // Settings buttons
+            document.getElementById('exportAllBtn').addEventListener('click', exportAllData);
+            document.getElementById('importAllBtn').addEventListener('click', importAllData);
+            document.getElementById('clearAllBtn').addEventListener('click', clearAllData);
+            document.getElementById('loadDemoBtn').addEventListener('click', loadDemoData);
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', handleKeyboardShortcuts);
+            
+            // Populate dropdowns
+            populateIndustryDropdowns();
+        });
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        async function performGlobalSearch() {
+            const query = document.getElementById('globalSearch').value.toLowerCase().trim();
+            if (!query) {
+                await refreshCurrentView();
+                return;
+            }
+            
+            if (currentView === 'organizations') {
+                const organizations = await getFromStore('organizations');
+                const filtered = organizations.filter(org => 
+                    org.name.toLowerCase().includes(query) ||
+                    (org.industry && org.industry.toLowerCase().includes(query)) ||
+                    (org.country && org.country.toLowerCase().includes(query)) ||
+                    (org.city && org.city.toLowerCase().includes(query)) ||
+                    (org.website && org.website.toLowerCase().includes(query))
+                );
+                displayOrganizations(filtered);
+            }
+        }
+
+        async function filterOrganizations() {
+            const industry = document.getElementById('industryFilter').value;
+            const country = document.getElementById('countryFilter').value;
+            const size = document.getElementById('sizeFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            const organizations = await getFromStore('organizations');
+            
+            const filtered = organizations.filter(org => {
+                return (!industry || org.industry === industry) &&
+                       (!country || org.country === country) &&
+                       (!size || org.size === size) &&
+                       (!status || org.status === status);
+            });
+            
+            displayOrganizations(filtered);
+        }
+
+        function clearFilters() {
+            document.getElementById('industryFilter').value = '';
+            document.getElementById('countryFilter').value = '';
+            document.getElementById('sizeFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            loadOrganizations();
+        }
+
+        function switchOrgTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.org-tab').forEach(tab => {
+                tab.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                tab.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active', 'border-blue-500', 'text-blue-600');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.remove('border-transparent', 'text-gray-500');
+            
+            // Show/hide tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            document.getElementById(tabName + 'Tab').classList.remove('hidden');
+        }
+
+        async function exportOrganizations() {
+            const organizations = await getFromStore('organizations');
+            const csv = convertToCSV(organizations, ['name', 'industry', 'country', 'city', 'website', 'size', 'status', 'tags']);
+            downloadCSV(csv, 'organizations.csv');
+        }
+
+        function convertToCSV(data, fields) {
+            const headers = fields.join(',');
+            const rows = data.map(item => 
+                fields.map(field => {
+                    let value = item[field] || '';
+                    if (Array.isArray(value)) {
+                        value = value.join(';');
+                    }
+                    return `"${value}"`;
+                }).join(',')
+            );
+            return [headers, ...rows].join('\n');
+        }
+
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', filename);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function handleCSVFile() {
+            const file = document.getElementById('csvFile').files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                const lines = csv.split('\n');
+                const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+                
+                // Show preview
+                const previewTable = document.getElementById('previewTable');
+                previewTable.innerHTML = '';
+                
+                // Headers
+                const headerRow = document.createElement('tr');
+                headerRow.innerHTML = headers.map(h => `<th class="border p-2 bg-gray-50">${h}</th>`).join('');
+                previewTable.appendChild(headerRow);
+                
+                // Sample rows (first 5)
+                for (let i = 1; i < Math.min(6, lines.length); i++) {
+                    if (lines[i].trim()) {
+                        const cells = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+                        const row = document.createElement('tr');
+                        row.innerHTML = cells.map(c => `<td class="border p-2">${c}</td>`).join('');
+                        previewTable.appendChild(row);
+                    }
+                }
+                
+                document.getElementById('csvPreview').classList.remove('hidden');
+                document.getElementById('processImportBtn').disabled = false;
+            };
+            reader.readAsText(file);
+        }
+
+        async function processCSVImport() {
+            const file = document.getElementById('csvFile').files[0];
+            const importType = document.getElementById('importType').value;
+            
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async function(
