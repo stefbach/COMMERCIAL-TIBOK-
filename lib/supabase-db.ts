@@ -21,13 +21,13 @@ export class SupabaseDB {
   // Organizations
   static async getOrganizations(): Promise<Organization[]> {
     const supabase = await this.getServerClient()
-    const { data, error } = await supabase.from("organizations").select("*").order("createdDate", { ascending: false })
+    const { data, error } = await supabase.from("organizations").select("*").order("created_at", { ascending: false })
 
     if (error) throw error
     return data || []
   }
 
-  static async createOrganization(org: Omit<Organization, "id" | "createdDate">): Promise<Organization> {
+  static async createOrganization(org: Omit<Organization, "id" | "created_at">): Promise<Organization> {
     const supabase = await this.getServerClient()
     const {
       data: { user },
@@ -37,7 +37,7 @@ export class SupabaseDB {
 
     const { data, error } = await supabase
       .from("organizations")
-      .insert({ ...org, createdDate: new Date().toISOString() })
+      .insert({ ...org, created_at: new Date().toISOString() })
       .select()
       .single()
 
@@ -63,7 +63,7 @@ export class SupabaseDB {
   // Contacts
   static async getContacts(): Promise<Contact[]> {
     const supabase = await this.getServerClient()
-    const { data, error } = await supabase.from("contacts").select("*").order("id", { ascending: false })
+    const { data, error } = await supabase.from("contacts").select("*").order("created_at", { ascending: false })
 
     if (error) throw error
     return data || []
@@ -255,18 +255,18 @@ export class SupabaseClientDB {
     }
 
     const supabase = this.getClient()
-    const { data, error } = await supabase.from("organizations").select("*").order("createdDate", { ascending: false })
+    const { data, error } = await supabase.from("organizations").select("*").order("created_at", { ascending: false })
 
     if (error) throw error
     return data || []
   }
 
-  static async createOrganization(org: Omit<Organization, "id" | "createdDate">): Promise<Organization> {
+  static async createOrganization(org: Omit<Organization, "id" | "created_at">): Promise<Organization> {
     if (this.isDemoMode()) {
       const newOrg: Organization = {
         ...org,
         id: generateId(),
-        createdDate: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       }
       const organizations = getDemoData("organizations")
       organizations.unshift(newOrg)
@@ -278,7 +278,7 @@ export class SupabaseClientDB {
 
     const { data, error } = await supabase
       .from("organizations")
-      .insert({ ...org, createdDate: new Date().toISOString() })
+      .insert({ ...org, created_at: new Date().toISOString() })
       .select()
       .single()
 
@@ -326,7 +326,7 @@ export class SupabaseClientDB {
     }
 
     const supabase = this.getClient()
-    const { data, error } = await supabase.from("contacts").select("*").order("id", { ascending: false })
+    const { data, error } = await supabase.from("contacts").select("*").order("created_at", { ascending: false })
 
     if (error) throw error
     return data || []
@@ -355,15 +355,15 @@ export class SupabaseClientDB {
   static async getContactsByOrganization(organizationId: number): Promise<Contact[]> {
     if (this.isDemoMode()) {
       const contacts = getDemoData("contacts")
-      return contacts.filter((contact: Contact) => contact.organizationId === organizationId)
+      return contacts.filter((contact: Contact) => contact.organization_id === organizationId)
     }
 
     const supabase = this.getClient()
     const { data, error } = await supabase
       .from("contacts")
       .select("*")
-      .eq("organizationId", organizationId)
-      .order("id", { ascending: false })
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
 
     if (error) throw error
     return data || []
@@ -666,7 +666,7 @@ export class SupabaseClientDB {
     }
 
     const supabase = this.getClient()
-    const { data, error } = await supabase.from("contracts").select("*").order("createdDate", { ascending: false })
+    const { data, error } = await supabase.from("contracts").select("*").order("created_at", { ascending: false })
 
     if (error) throw error
     return data || []
@@ -677,8 +677,8 @@ export class SupabaseClientDB {
       const newContract: Contract = {
         ...contract,
         id: generateId(),
-        createdDate: new Date(),
-        updatedDate: new Date(),
+        createdDate: new Date().toISOString(),
+        updatedDate: new Date().toISOString(),
       }
       const contracts = getDemoData("contracts")
       contracts.unshift(newContract)
@@ -691,8 +691,8 @@ export class SupabaseClientDB {
       .from("contracts")
       .insert({
         ...contract,
-        createdDate: new Date().toISOString(),
-        updatedDate: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single()
@@ -709,7 +709,7 @@ export class SupabaseClientDB {
         contracts[index] = {
           ...contracts[index],
           ...updates,
-          updatedDate: new Date(),
+          updatedDate: new Date().toISOString(),
         }
         setDemoData("contracts", contracts)
         return contracts[index]
@@ -720,7 +720,7 @@ export class SupabaseClientDB {
     const supabase = this.getClient()
     const { data, error } = await supabase
       .from("contracts")
-      .update({ ...updates, updatedDate: new Date().toISOString() })
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single()
@@ -753,8 +753,8 @@ export class SupabaseClientDB {
     const { data, error } = await supabase
       .from("contracts")
       .select("*")
-      .eq("organizationId", organizationId)
-      .order("createdDate", { ascending: false })
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
 
     if (error) throw error
     return data || []
@@ -770,8 +770,8 @@ export class SupabaseClientDB {
     const { data, error } = await supabase
       .from("contracts")
       .select("*")
-      .eq("assignedTo", assignedTo)
-      .order("createdDate", { ascending: false })
+      .eq("assigned_to", assignedTo)
+      .order("created_at", { ascending: false })
 
     if (error) throw error
     return data || []
@@ -816,7 +816,8 @@ const getInitialDemoData = (key: string) => {
           size: "Large",
           status: "Active",
           tags: ["Premium", "Luxe"],
-          createdDate: new Date("2024-01-15"),
+          created_at: "2024-01-15T10:00:00.000Z",
+          updated_at: "2024-01-15T10:00:00.000Z",
           activityType: "Hôtel",
         },
         {
@@ -832,7 +833,8 @@ const getInitialDemoData = (key: string) => {
           size: "Small",
           status: "Prospect",
           tags: ["Santé", "Local"],
-          createdDate: new Date("2024-02-01"),
+          created_at: "2024-02-01T10:00:00.000Z",
+          updated_at: "2024-02-01T10:00:00.000Z",
           activityType: "Pharmacie",
         },
       ]
@@ -841,7 +843,7 @@ const getInitialDemoData = (key: string) => {
       return [
         {
           id: "1",
-          organizationId: 1,
+          organization_id: 1,
           fullName: "Marie Dubois",
           role: "Directrice Générale",
           email: "marie.dubois@legrandpalace.fr",
@@ -850,16 +852,18 @@ const getInitialDemoData = (key: string) => {
           linkedinProfile: "https://linkedin.com/in/marie-dubois",
           consentMarketing: true,
           notes: "Très intéressée par nos solutions. Préfère les rendez-vous en matinée.",
-          lastContactDate: new Date("2024-03-01"),
-          nextFollowUpDate: new Date("2024-03-15"),
+          lastContactDate: "2024-03-01T10:00:00.000Z",
+          nextFollowUpDate: "2024-03-15T10:00:00.000Z",
           appointmentHistory: [],
           prospectStatus: "hot",
           priority: "high",
           source: "Référence",
+          created_at: "2024-02-15T10:00:00.000Z",
+          updated_at: "2024-03-01T10:00:00.000Z",
         },
         {
           id: "2",
-          organizationId: 2,
+          organization_id: 2,
           fullName: "Pierre Martin",
           role: "Pharmacien Titulaire",
           email: "pierre.martin@pharmacie-central.fr",
@@ -867,12 +871,14 @@ const getInitialDemoData = (key: string) => {
           mobilePhone: "06 98 76 54 32",
           consentMarketing: true,
           notes: "Demande plus d'informations sur les tarifs.",
-          lastContactDate: new Date("2024-02-28"),
-          nextFollowUpDate: new Date("2024-03-10"),
+          lastContactDate: "2024-02-28T10:00:00.000Z",
+          nextFollowUpDate: "2024-03-10T10:00:00.000Z",
           appointmentHistory: [],
           prospectStatus: "cold",
           priority: "medium",
           source: "Site web",
+          created_at: "2024-02-20T10:00:00.000Z",
+          updated_at: "2024-02-28T10:00:00.000Z",
         },
       ]
 
@@ -880,7 +886,7 @@ const getInitialDemoData = (key: string) => {
       return [
         {
           id: "z9fr8aj0e",
-          organizationId: 1,
+          organization_id: 1,
           contact_id: "1",
           title: "Présentation solution CRM",
           description: "Démonstration des fonctionnalités principales",
@@ -894,11 +900,12 @@ const getInitialDemoData = (key: string) => {
           type: "Meeting",
           status: "Scheduled",
           reminder: true,
-          createdDate: new Date("2024-03-01"),
+          created_at: "2024-03-01T10:00:00.000Z",
+          updated_at: "2024-03-01T10:00:00.000Z",
         },
         {
           id: "7d3o9kq7c",
-          organizationId: 2,
+          organization_id: 2,
           contact_id: "2",
           title: "Appel de suivi",
           description: "Discussion sur les besoins spécifiques",
@@ -911,7 +918,40 @@ const getInitialDemoData = (key: string) => {
           type: "Call",
           status: "Scheduled",
           reminder: true,
-          createdDate: new Date("2024-03-05"),
+          created_at: "2024-03-05T10:00:00.000Z",
+          updated_at: "2024-03-05T10:00:00.000Z",
+        },
+      ]
+
+    case "deals":
+      return [
+        {
+          id: "deal_001",
+          organization_id: 1,
+          contact_id: "1",
+          title: "CRM Solution - Hôtel Le Grand Palace",
+          description: "Implémentation complète du système CRM",
+          value: 25000,
+          currency: "EUR",
+          stage: "proposal",
+          probability: 75,
+          expected_close_date: "2024-04-15",
+          created_at: "2024-03-01T10:00:00.000Z",
+          updated_at: "2024-03-01T10:00:00.000Z",
+        },
+        {
+          id: "deal_002",
+          organization_id: 2,
+          contact_id: "2",
+          title: "CRM Solution - Pharmacie Central",
+          description: "Solution CRM adaptée aux pharmacies",
+          value: 12000,
+          currency: "EUR",
+          stage: "qualification",
+          probability: 50,
+          expected_close_date: "2024-05-01",
+          created_at: "2024-02-28T10:00:00.000Z",
+          updated_at: "2024-02-28T10:00:00.000Z",
         },
       ]
 

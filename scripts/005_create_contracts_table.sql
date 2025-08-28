@@ -13,8 +13,9 @@ CREATE TABLE IF NOT EXISTS contracts (
   assigned_to VARCHAR(255) NOT NULL,
   documents TEXT[], -- Array of document URLs/paths
   notes TEXT,
-  created_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  -- Using created_at and updated_at to match other tables
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create indexes for better performance
@@ -22,7 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_contracts_organization_id ON contracts(organizati
 CREATE INDEX IF NOT EXISTS idx_contracts_contact_id ON contracts(contact_id);
 CREATE INDEX IF NOT EXISTS idx_contracts_assigned_to ON contracts(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status);
-CREATE INDEX IF NOT EXISTS idx_contracts_created_date ON contracts(created_date);
+-- Using created_at instead of created_date for index
+CREATE INDEX IF NOT EXISTS idx_contracts_created_at ON contracts(created_at);
 
 -- Enable RLS (Row Level Security)
 ALTER TABLE contracts ENABLE ROW LEVEL SECURITY;
