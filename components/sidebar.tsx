@@ -7,8 +7,6 @@ import {
   LayoutDashboard,
   Building2,
   Users,
-  GitBranch,
-  Calendar,
   Settings,
   Menu,
   LogOut,
@@ -28,11 +26,9 @@ interface SidebarProps {
 const navigation = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "organizations", label: "Organizations", icon: Building2 },
-  { id: "contacts", label: "Contacts", icon: Users },
-  { id: "pipeline", label: "Pipeline", icon: GitBranch },
   { id: "appointments", label: "Rendez-vous", icon: CalendarDays },
   { id: "contracts", label: "Contrats", icon: FileText },
-  { id: "activities", label: "Activities", icon: Calendar },
+  { id: "users", label: "Utilisateurs", icon: Users },
   { id: "settings", label: "Settings", icon: Settings },
 ]
 

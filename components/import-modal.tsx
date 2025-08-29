@@ -29,16 +29,20 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
   const getExpectedFields = () => {
     if (type === "organizations") {
       return [
-        { key: "name", label: "Nom de l'organisation", required: true },
-        { key: "industry", label: "Secteur d'activité", required: false },
-        { key: "activityType", label: "Type d'activité", required: false },
-        { key: "email", label: "Email", required: false },
-        { key: "phone", label: "Téléphone", required: false },
-        { key: "website", label: "Site web", required: false },
-        { key: "address", label: "Adresse", required: false },
+        { key: "name", label: "Nom", required: true },
+        { key: "industry", label: "Type", required: false },
+        { key: "category", label: "Categorie (etoiles)", required: false },
+        { key: "region", label: "Region", required: false },
+        { key: "zone_geographique", label: "Zone geographique", required: false },
+        { key: "district", label: "District", required: false },
         { key: "city", label: "Ville", required: false },
-        { key: "region", label: "Région", required: false },
-        { key: "notes", label: "Notes", required: false },
+        { key: "address", label: "Adresse precise", required: false },
+        { key: "secteur", label: "Secteur", required: false },
+        { key: "website", label: "Site web officiel", required: false },
+        { key: "nb_chambres", label: "Nb de chambres", required: false },
+        { key: "phone", label: "Téléphone", required: false },
+        { key: "email", label: "Email", required: false },
+        { key: "notes", label: "Commentaires", required: false },
       ]
     } else {
       return [
@@ -152,12 +156,19 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
             col.toLowerCase().includes(field.key.toLowerCase()) ||
             field.label.toLowerCase().includes(col.toLowerCase()) ||
             (field.key === "name" && (col.includes("nom") || col.includes("name"))) ||
+            (field.key === "industry" && (col.includes("type") || col.includes("activite"))) ||
+            (field.key === "category" && (col.includes("categorie") || col.includes("etoiles"))) ||
+            (field.key === "region" && col.includes("region")) ||
+            (field.key === "zone_geographique" && (col.includes("zone") || col.includes("geographique"))) ||
+            (field.key === "district" && col.includes("district")) ||
+            (field.key === "city" && (col.includes("ville") || col.includes("city"))) ||
+            (field.key === "address" && (col.includes("adresse") || col.includes("address"))) ||
+            (field.key === "secteur" && col.includes("secteur")) ||
+            (field.key === "website" && (col.includes("site") || col.includes("web") || col.includes("website"))) ||
+            (field.key === "nb_chambres" && (col.includes("chambres") || col.includes("rooms"))) ||
             (field.key === "phone" && (col.includes("tel") || col.includes("phone"))) ||
             (field.key === "email" && col.includes("email")) ||
-            (field.key === "website" && col.includes("website")) ||
-            (field.key === "address" && col.includes("adresse")) ||
-            (field.key === "city" && col.includes("ville")) ||
-            (field.key === "region" && col.includes("région")),
+            (field.key === "notes" && (col.includes("commentaires") || col.includes("notes"))),
         )
         if (matchingColumn) {
           autoMapping[field.key] = matchingColumn

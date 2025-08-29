@@ -90,9 +90,6 @@ export function ProspectDetailModal({ isOpen, onClose, contact, onUpdate }: Pros
         type: newAppointment.type,
         status: "Scheduled",
         reminder: true,
-        city: contact.city || "",
-        region: contact.region || "",
-        address: newAppointment.location || "",
       }
 
       console.log("[v0] Creating appointment with data:", appointment)
