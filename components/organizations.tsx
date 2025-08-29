@@ -572,25 +572,31 @@ export function Organizations() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
         {filteredOrganizations.map((org) => {
           return (
-            <Card key={org.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
+            <Card
+              key={org.id}
+              className="hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-primary/20"
+              onClick={() => handleManageOrganization(org)}
+            >
+              <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-primary" />
+                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                      <Building2 className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{org.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">
+                      <CardTitle className="text-xl font-bold text-balance">{org.name}</CardTitle>
+                      <p className="text-sm text-muted-foreground font-medium">
                         {org.activityType || org.industry || "No industry"}
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <Badge className={getStatusColor(org.status || "")}>{org.status}</Badge>
+                  <div className="flex flex-col gap-2">
+                    <Badge className={getStatusColor(org.status || "")} variant="secondary">
+                      {org.status}
+                    </Badge>
                     {org.priority && (
                       <Badge className={getPriorityColor(org.priority)} variant="outline">
                         {org.priority}
@@ -599,60 +605,97 @@ export function Organizations() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
                   {org.category && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <span className="font-medium mr-2">Catégorie:</span>
-                      {org.category}
+                    <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                      <span className="text-sm font-medium text-muted-foreground">Catégorie</span>
+                      <span className="text-sm font-semibold">{org.category}</span>
                     </div>
                   )}
 
                   {org.contact_principal && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <User className="w-4 h-4 mr-2" />
-                      {org.contact_principal} {org.contact_fonction && `- ${org.contact_fonction}`}
+                    <div className="flex items-center space-x-3 p-2 bg-blue-50 rounded-lg">
+                      <User className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-blue-900 truncate">{org.contact_principal}</p>
+                        {org.contact_fonction && <p className="text-xs text-blue-600">{org.contact_fonction}</p>}
+                      </div>
                     </div>
                   )}
 
                   {org.phone && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Phone className="w-4 h-4 mr-2" />
-                      {org.phone}
+                    <div className="flex items-center space-x-3 p-2 bg-green-50 rounded-lg">
+                      <Phone className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <span className="text-sm font-medium text-green-900">{org.phone}</span>
                     </div>
                   )}
 
                   {org.email && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Mail className="w-4 h-4 mr-2" />
-                      {org.email}
+                    <div className="flex items-center space-x-3 p-2 bg-purple-50 rounded-lg">
+                      <Mail className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                      <span className="text-sm font-medium text-purple-900 truncate">{org.email}</span>
                     </div>
                   )}
 
-                  {(org.city || org.country) && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <MapPin className="w-4 h-4 mr-2" />
-                      {org.city && org.country ? `${org.city}, ${org.country}` : org.city || org.country}
-                      {org.region && ` (${org.region})`}
-                      {org.district && ` - ${org.district}`}
+                  {(org.city || org.country || org.region || org.district || org.zone_geographique) && (
+                    <div className="p-3 bg-orange-50 rounded-lg">
+                      <div className="flex items-start space-x-3">
+                        <MapPin className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 space-y-1">
+                          {(org.city || org.country) && (
+                            <p className="text-sm font-semibold text-orange-900">
+                              {org.city && org.country ? `${org.city}, ${org.country}` : org.city || org.country}
+                            </p>
+                          )}
+                          {org.address && <p className="text-xs text-orange-700">{org.address}</p>}
+                          <div className="flex flex-wrap gap-1">
+                            {org.region && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-orange-100 text-orange-800 border-orange-200"
+                              >
+                                {org.region}
+                              </Badge>
+                            )}
+                            {org.district && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-orange-100 text-orange-800 border-orange-200"
+                              >
+                                {org.district}
+                              </Badge>
+                            )}
+                            {org.zone_geographique && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-orange-100 text-orange-800 border-orange-200"
+                              >
+                                {org.zone_geographique}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
                   {org.secteur && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <span className="font-medium mr-2">Secteur:</span>
-                      {org.secteur}
+                    <div className="flex items-center justify-between p-2 bg-indigo-50 rounded-lg">
+                      <span className="text-sm font-medium text-indigo-600">Secteur</span>
+                      <span className="text-sm font-semibold text-indigo-900">{org.secteur}</span>
                     </div>
                   )}
 
                   {org.website && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Globe className="w-4 h-4 mr-2" />
+                    <div className="flex items-center space-x-3 p-2 bg-cyan-50 rounded-lg">
+                      <Globe className="w-5 h-5 text-cyan-600 flex-shrink-0" />
                       <a
                         href={org.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:text-primary transition-colors"
+                        className="text-sm font-medium text-cyan-900 hover:text-cyan-700 transition-colors truncate"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         {org.website}
                       </a>
@@ -660,77 +703,97 @@ export function Organizations() {
                   )}
 
                   {org.nb_chambres !== undefined && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Building2 className="w-4 h-4 mr-2" />
-                      {org.nb_chambres} Chambres
+                    <div className="flex items-center justify-between p-2 bg-teal-50 rounded-lg">
+                      <span className="text-sm font-medium text-teal-600">Chambres</span>
+                      <span className="text-sm font-bold text-teal-900">{org.nb_chambres}</span>
                     </div>
                   )}
 
-                  <div className="pt-2 border-t">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span className="text-xs font-medium text-muted-foreground">Qualification rapide:</span>
+                  {org.notes && (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Notes</p>
+                      <p className="text-sm text-gray-800 line-clamp-3">{org.notes}</p>
                     </div>
-                    <div className="flex items-center space-x-1 mb-2">
-                      <Select
-                        value={org.status || ""}
-                        onValueChange={(value) => handleQualifyOrganization(org, value, org.priority || "medium")}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Statut" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="prospect">Prospect</SelectItem>
-                          <SelectItem value="active">Actif</SelectItem>
-                          <SelectItem value="inactive">Inactif</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={org.priority || ""}
-                        onValueChange={(value) => handleQualifyOrganization(org, org.status || "prospect", value)}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Priorité" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="high">Haute</SelectItem>
-                          <SelectItem value="medium">Moyenne</SelectItem>
-                          <SelectItem value="low">Basse</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                  )}
+                </div>
 
-                  <div className="pt-2 space-y-2">
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <span className="text-sm font-semibold text-gray-700">Qualification rapide</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <Select
+                      value={org.status || ""}
+                      onValueChange={(value) => {
+                        handleQualifyOrganization(org, value, org.priority || "medium")
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <SelectValue placeholder="Statut" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="prospect">Prospect</SelectItem>
+                        <SelectItem value="active">Actif</SelectItem>
+                        <SelectItem value="inactive">Inactif</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={org.priority || ""}
+                      onValueChange={(value) => {
+                        handleQualifyOrganization(org, org.status || "prospect", value)
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <SelectValue placeholder="Priorité" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="high">Haute</SelectItem>
+                        <SelectItem value="medium">Moyenne</SelectItem>
+                        <SelectItem value="low">Basse</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Button
+                    size="default"
+                    variant="default"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleManageOrganization(org)
+                    }}
+                    className="w-full bg-primary hover:bg-primary/90 h-10"
+                  >
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Voir Détails Complets
+                  </Button>
+
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       size="sm"
-                      variant="default"
-                      onClick={() => handleManageOrganization(org)}
-                      className="w-full bg-primary hover:bg-primary/90"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleManageOrganization(org)
+                      }}
+                      className="h-9"
                     >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Gérer RDV, Notes & Contrats
+                      <Edit className="w-4 h-4 mr-1" />
+                      Modifier
                     </Button>
-
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleManageOrganization(org)}
-                        className="flex-1"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Modifier
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteOrganization(org)}
-                        className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Supprimer
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteOrganization(org)
+                      }}
+                      className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Supprimer
+                    </Button>
                   </div>
                 </div>
               </CardContent>

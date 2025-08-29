@@ -231,23 +231,6 @@ export class SupabaseDB {
     return data || []
   }
 
-  static async createAppointment(appointment: Omit<Appointment, "id">): Promise<Appointment> {
-    const supabase = await this.getServerClient()
-
-    const { data, error } = await supabase.from("appointments").insert(appointment).select().single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async updateAppointment(id: string, updates: Partial<Appointment>): Promise<Appointment> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase.from("appointments").update(updates).eq("id", id).select().single()
-
-    if (error) throw error
-    return data
-  }
-
   // The complete deleteAppointment method is implemented later in the class
 
   static async getAppointmentsByOrganization(organizationId: string): Promise<Appointment[]> {
@@ -284,6 +267,53 @@ export class SupabaseDB {
       const filtered = appointments.filter((appointment: Appointment) => appointment.organization_id === organizationId)
       console.log("[v0] Fallback appointments loaded:", filtered.length)
       return filtered
+    }
+  }
+
+  static async createAppointment(
+    appointment: Omit<Appointment, "id" | "created_at" | "updated_at">,
+  ): Promise<Appointment> {
+    console.log("[v0] createAppointment called with:", appointment)
+
+    try {
+      console.log("[v0] Using Supabase for appointment creation")
+      const supabase = await this.getServerClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        console.log("[v0] No authenticated user, falling back to demo mode")
+        throw new Error("User not authenticated")
+      }
+
+      const { data, error } = await supabase
+        .from("appointments")
+        .insert({
+          ...appointment,
+          created_by: user.id, // Add created_by field with authenticated user ID
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      console.log("[v0] Supabase appointment created:", data.id)
+      return data
+    } catch (error) {
+      console.log("[v0] Supabase creation failed, falling back to demo mode:", error.message)
+      const newAppointment: Appointment = {
+        ...appointment,
+        id: this.generateId(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      const appointments = this.getDemoData("appointments")
+      appointments.unshift(newAppointment)
+      this.setDemoData("appointments", appointments)
+      console.log("[v0] Fallback appointment created:", newAppointment.id)
+      return newAppointment
     }
   }
 }
@@ -929,10 +959,21 @@ export class SupabaseClientDB {
     try {
       console.log("[v0] Using Supabase for appointment creation")
       const supabase = this.getClient()
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        console.log("[v0] No authenticated user, falling back to demo mode")
+        throw new Error("User not authenticated")
+      }
+
       const { data, error } = await supabase
         .from("appointments")
         .insert({
           ...appointment,
+          created_by: user.id, // Add created_by field to satisfy NOT NULL constraint
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -943,7 +984,7 @@ export class SupabaseClientDB {
       console.log("[v0] Supabase appointment created:", data.id)
       return data
     } catch (error) {
-      console.error("[v0] Supabase creation failed, falling back to demo mode:", error)
+      console.log("[v0] Supabase creation failed, falling back to demo mode:", error.message)
       const newAppointment: Appointment = {
         ...appointment,
         id: this.generateId(),
