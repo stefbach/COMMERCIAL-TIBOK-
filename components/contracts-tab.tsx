@@ -317,7 +317,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
 
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Gestion des Contrats</h2>
+          <h2 className="text-2xl font-bold text-blue-600">Gestion des Contrats</h2>
           <p className="text-gray-600">Gérez vos contrats et leur affectation aux commerciaux</p>
           <p className="text-sm text-blue-600">{organizations.length} organisation(s) disponible(s) pour liaison</p>
         </div>

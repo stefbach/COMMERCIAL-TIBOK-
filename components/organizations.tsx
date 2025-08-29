@@ -445,7 +445,7 @@ export function Organizations() {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Organizations</h2>
+          <h2 className="text-3xl font-bold text-blue-600">Organizations</h2>
           <p className="text-muted-foreground">
             Gérez vos établissements mauriciens avec RDV, notes et contrats intégrés
           </p>
@@ -856,7 +856,8 @@ export function Organizations() {
       {filteredOrganizations.length === 0 && (
         <div className="text-center py-12">
           <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Aucune organisation trouvée</h3>
+          {/* Changed subtitle color to blue */}
+          <h3 className="text-lg font-semibold text-blue-600 mb-2">Aucune organisation trouvée</h3>
           <p className="text-muted-foreground mb-4">
             {searchTerm || Object.values(filters).some(Boolean)
               ? "Essayez d'ajuster vos termes de recherche ou filtres"

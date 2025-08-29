@@ -10,7 +10,7 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "CRM Universe - Prospection & Pipeline Management",
+  title: "TIBOK MARKETING - Prospection & Pipeline Management",
   description: "Modern CRM application for managing organizations, contacts, and sales pipelines",
   generator: "v0.app",
 }

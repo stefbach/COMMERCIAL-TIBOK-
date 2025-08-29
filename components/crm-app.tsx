@@ -151,7 +151,7 @@ export default function CRMApp({ initialUser }: CRMAppProps) {
       case "appointments":
         return (
           <div className="p-6">
-            <h2 className="text-3xl font-bold text-foreground mb-6">Rendez-vous</h2>
+            <h2 className="text-3xl font-bold text-blue-600 mb-6">Rendez-vous</h2>
             <AppointmentsTab contacts={contacts} organizations={organizations} />
           </div>
         )
@@ -164,14 +164,14 @@ export default function CRMApp({ initialUser }: CRMAppProps) {
       case "users":
         return (
           <div className="p-6">
-            <h2 className="text-3xl font-bold text-foreground mb-6">Gestion des Utilisateurs</h2>
+            <h2 className="text-3xl font-bold text-blue-600 mb-6">Gestion des Utilisateurs</h2>
             <UsersManagement />
           </div>
         )
       case "settings":
         return (
           <div className="p-6">
-            <h2 className="text-3xl font-bold text-foreground mb-4">Settings</h2>
+            <h2 className="text-3xl font-bold text-blue-600 mb-4">Settings</h2>
             <div className="space-y-6">
               <DatabaseDiagnostic />
               <div className="space-y-4">

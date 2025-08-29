@@ -706,7 +706,7 @@ export function Dashboard() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-3xl font-bold text-foreground">Dashboard</h2>
+        <h2 className="text-3xl font-bold text-blue-600">Dashboard</h2>
         <p className="text-muted-foreground">Vue d'ensemble de votre activité commerciale</p>
       </div>
 
@@ -717,7 +717,7 @@ export function Dashboard() {
             <Building2 className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalOrganizations}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.totalOrganizations}</div>
           </CardContent>
         </Card>
 
@@ -727,7 +727,7 @@ export function Dashboard() {
             <Calendar className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.completedAppointments}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.completedAppointments}</div>
           </CardContent>
         </Card>
 
@@ -737,7 +737,7 @@ export function Dashboard() {
             <FileCheck className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.signedContracts}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.signedContracts}</div>
           </CardContent>
         </Card>
 
@@ -747,7 +747,7 @@ export function Dashboard() {
             <Send className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.sentContracts}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.sentContracts}</div>
           </CardContent>
         </Card>
 
@@ -757,7 +757,7 @@ export function Dashboard() {
             <CalendarClock className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.upcomingAppointments}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.upcomingAppointments}</div>
           </CardContent>
         </Card>
       </div>

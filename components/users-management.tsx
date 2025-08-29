@@ -126,7 +126,7 @@ const UsersManagement = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Gestion des Utilisateurs</h1>
+          <h1 className="text-2xl font-bold text-blue-600">Gestion des Utilisateurs</h1>
           <p className="text-muted-foreground">Gérez les administrateurs et commerciaux</p>
         </div>
       </div>
@@ -145,7 +145,7 @@ const UsersManagement = () => {
 
         <TabsContent value="admins" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold">Administrateurs</h2>
+            <h2 className="text-lg font-semibold text-blue-600">Administrateurs</h2>
             <Dialog open={isAddingAdmin} onOpenChange={setIsAddingAdmin}>
               <DialogTrigger asChild>
                 <Button>
@@ -218,7 +218,7 @@ const UsersManagement = () => {
 
         <TabsContent value="commerciaux" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold">Commerciaux</h2>
+            <h2 className="text-lg font-semibold text-blue-600">Commerciaux</h2>
             <Dialog open={isAddingCommercial} onOpenChange={setIsAddingCommercial}>
               <DialogTrigger asChild>
                 <Button>

@@ -50,7 +50,7 @@ export function Sidebar({ currentView, onViewChange, user, onLogout }: SidebarPr
           </div>
           {!isCollapsed && (
             <div className="ml-3">
-              <h1 className="text-xl font-bold text-sidebar-foreground">CRM Universe</h1>
+              <h1 className="text-xl font-bold text-blue-600">TIBOK MARKETING</h1>
               {user && (
                 <p className="text-sm text-sidebar-foreground/70">
                   {user.user_metadata?.full_name || user.email?.split("@")[0]} ({user.user_metadata?.role || "user"})
