@@ -241,76 +241,14 @@ export class SupabaseDB {
   }
 
   static async updateAppointment(id: string, updates: Partial<Appointment>): Promise<Appointment> {
-    console.log("[v0] updateAppointment called with id:", id)
-
-    // Check if we should use demo mode
-    if (await this.isDemoMode()) {
-      console.log("[v0] Using demo mode for appointment update")
-      const appointments = this.getDemoData("appointments") as Appointment[]
-      const index = appointments.findIndex((a) => a.id === id)
-
-      if (index === -1) {
-        throw new Error("Appointment not found")
-      }
-
-      const updatedAppointment = {
-        ...appointments[index],
-        ...updates,
-        updated_at: new Date().toISOString(),
-      }
-
-      appointments[index] = updatedAppointment
-      this.setDemoData("appointments", appointments)
-
-      console.log("[v0] Demo appointment updated:", updatedAppointment.id)
-      return updatedAppointment
-    }
-
-    // Try Supabase first
-    try {
-      console.log("[v0] Using Supabase for appointment update")
-      const supabase = await this.getServerClient()
-      const { data, error } = await supabase
-        .from("appointments")
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .select()
-        .single()
-
-      if (error) throw error
-      console.log("[v0] Supabase appointment updated:", data.id)
-      return data
-    } catch (error) {
-      console.log("[v0] Supabase update failed, falling back to demo mode:", error)
-
-      // Fallback to demo mode
-      const appointments = this.getDemoData("appointments") as Appointment[]
-      const index = appointments.findIndex((a) => a.id === id)
-
-      if (index === -1) {
-        throw new Error("Appointment not found")
-      }
-
-      const updatedAppointment = {
-        ...appointments[index],
-        ...updates,
-        updated_at: new Date().toISOString(),
-      }
-
-      appointments[index] = updatedAppointment
-      this.setDemoData("appointments", appointments)
-
-      console.log("[v0] Fallback appointment updated:", updatedAppointment.id)
-      return updatedAppointment
-    }
-  }
-
-  static async deleteAppointment(id: string): Promise<void> {
     const supabase = await this.getServerClient()
-    const { error } = await supabase.from("appointments").delete().eq("id", id)
+    const { data, error } = await supabase.from("appointments").update(updates).eq("id", id).select().single()
 
     if (error) throw error
+    return data
   }
+
+  // The complete deleteAppointment method is implemented later in the class
 
   static async getAppointmentsByOrganization(organizationId: string): Promise<Appointment[]> {
     console.log("[v0] Loading appointments for organization:", organizationId)
@@ -356,53 +294,43 @@ export class SupabaseClientDB {
     return createBrowserClient()
   }
 
-  private static async isDemoMode() {
-    console.log("[v0] FORCING DEMO MODE - Bypassing Supabase due to RLS policy violations")
-    return true
-
-    // Original code commented out until RLS policies are fixed
-    /*
+  private static async isDemoMode(): Promise<boolean> {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    console.log("[v0] Environment variables check:", {
-      url: url ? "present" : "missing",
-      key: key ? "present" : "missing",
-      urlValue: url?.substring(0, 20) + "...",
-      keyValue: key?.substring(0, 20) + "...",
-    })
+    console.log("[v0] Checking demo mode - URL:", !!url, "KEY:", !!key)
 
     if (!url || !key || url.trim() === "" || key.trim() === "") {
-      console.log("[v0] Mode DEMO activé - Variables d'environnement Supabase manquantes ou vides")
+      console.log("[v0] Missing Supabase environment variables, using demo mode")
       return true
     }
 
-    // Check if user is authenticated
     try {
-      const supabase = this.getClient()
+      const client = this.getClient()
       const {
         data: { user },
-        error,
-      } = await supabase.auth.getUser()
+      } = await client.auth.getUser()
+      console.log("[v0] Auth check - User:", !!user)
 
-      if (error || !user) {
-        console.log("[v0] No authenticated user, using demo mode:", error?.message || "No user")
+      // Test database connection
+      const { data, error } = await client.from("organizations").select("count").limit(1)
+      if (error) {
+        console.log("[v0] Database connection failed, using demo mode:", error.message)
         return true
       }
 
-      console.log("[v0] User authenticated, using Supabase mode")
+      console.log("[v0] Supabase connection successful, using database mode")
       return false
     } catch (error) {
-      console.log("[v0] Auth check failed, using demo mode:", error)
+      console.log("[v0] Connection test failed, using demo mode:", error)
       return true
     }
-    */
   }
 
   static async createOrganization(orgData: Partial<Organization>): Promise<Organization> {
     console.log("[v0] Creating organization:", orgData.name)
 
-    // Force demo mode for now
+    // Check if we should use demo mode
     const demoMode = await this.isDemoMode()
     console.log("[v0] Demo mode for organization creation:", demoMode)
 
@@ -428,7 +356,7 @@ export class SupabaseClientDB {
         contact_principal: orgData.contact_principal || "",
         contact_fonction: orgData.contact_fonction || "",
         size: orgData.size || "",
-        country: orgData.country || "France",
+        country: orgData.country || "Maurice",
         status: orgData.status || "Actif",
         priority: orgData.priority || "Moyenne",
         created_at: new Date().toISOString(),
@@ -441,10 +369,35 @@ export class SupabaseClientDB {
       return newOrg
     }
 
-    // This code won't execute due to forced demo mode, but kept for future use
+    // Try Supabase with only columns that exist in the database
     try {
       const supabase = this.getClient()
-      const { data, error } = await supabase.from("organizations").insert([orgData]).select().single()
+
+      const supabaseData = {
+        name: orgData.name || "",
+        industry: orgData.industry || "",
+        category: orgData.category || "",
+        region: orgData.region || "",
+        zone_geographique: orgData.zone_geographique || "",
+        district: orgData.district || "",
+        city: orgData.city || "",
+        address: orgData.address || "",
+        secteur: orgData.secteur || "",
+        website: orgData.website || "",
+        nb_chambres: orgData.nb_chambres || 0,
+        phone: orgData.phone || "",
+        email: orgData.email || "",
+        notes: orgData.notes || "",
+        contact_principal: orgData.contact_principal || "",
+        contact_fonction: orgData.contact_fonction || "",
+        size: orgData.size || "",
+        country: orgData.country || "Maurice",
+        status: orgData.status || "Actif",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase.from("organizations").insert([supabaseData]).select().single()
 
       if (error) {
         console.log("[v0] Supabase insert failed, falling back to demo mode:", error.message)
@@ -453,6 +406,7 @@ export class SupabaseClientDB {
         const newOrg: Organization = {
           id: this.generateId(),
           ...orgData,
+          priority: orgData.priority || "Moyenne", // Keep priority in localStorage
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         } as Organization
@@ -463,7 +417,8 @@ export class SupabaseClientDB {
         return newOrg
       }
 
-      return data
+      console.log("[v0] Organization successfully created in Supabase")
+      return { ...data, priority: orgData.priority || "Moyenne" } as Organization
     } catch (error) {
       console.log("[v0] Supabase failed, falling back to demo mode:", error)
       // Fallback to localStorage
@@ -471,6 +426,7 @@ export class SupabaseClientDB {
       const newOrg: Organization = {
         id: this.generateId(),
         ...orgData,
+        priority: orgData.priority || "Moyenne",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as Organization
@@ -485,11 +441,34 @@ export class SupabaseClientDB {
   static async getOrganizations(): Promise<Organization[]> {
     console.log("[v0] Loading organizations...")
 
-    // Force demo mode
-    console.log("[v0] Using demo mode for organizations")
-    const demoOrgs = this.getDemoData("organizations")
-    console.log("[v0] Demo organizations loaded:", demoOrgs.length)
-    return demoOrgs
+    // Check if we should use demo mode
+    if (await this.isDemoMode()) {
+      console.log("[v0] Using demo mode for organizations")
+      const demoOrgs = this.getDemoData("organizations")
+      console.log("[v0] Demo organizations loaded:", demoOrgs.length)
+      return demoOrgs
+    }
+
+    try {
+      console.log("[v0] Using Supabase for organizations")
+      const supabase = this.getClient()
+      const { data, error } = await supabase.from("organizations").select("*").order("created_at", { ascending: false })
+
+      if (error) {
+        console.log("[v0] Supabase error, falling back to demo mode:", error.message)
+        const demoOrgs = this.getDemoData("organizations")
+        console.log("[v0] Fallback organizations loaded:", demoOrgs.length)
+        return demoOrgs
+      }
+
+      console.log("[v0] Supabase organizations loaded:", data?.length || 0)
+      return data || []
+    } catch (error) {
+      console.log("[v0] Supabase failed, falling back to demo mode:", error)
+      const demoOrgs = this.getDemoData("organizations")
+      console.log("[v0] Fallback organizations loaded:", demoOrgs.length)
+      return demoOrgs
+    }
   }
 
   static async updateOrganization(id: number, updates: Partial<Organization>): Promise<Organization> {
