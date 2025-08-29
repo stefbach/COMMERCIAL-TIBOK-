@@ -384,6 +384,53 @@ export function Organizations() {
     }
   }
 
+  const migrateLocalStorageToSupabase = async () => {
+    try {
+      const localData = localStorage.getItem("demo_organizations")
+      if (!localData) {
+        alert("Aucune donnée locale trouvée à migrer")
+        return
+      }
+
+      const localOrgs = JSON.parse(localData)
+      if (!Array.isArray(localOrgs) || localOrgs.length === 0) {
+        alert("Aucune organisation locale trouvée")
+        return
+      }
+
+      console.log(`[v0] Migrating ${localOrgs.length} organizations from localStorage to Supabase`)
+
+      let migrated = 0
+      const errors: string[] = []
+
+      for (const org of localOrgs) {
+        try {
+          // Remove demo ID and let Supabase generate a real UUID
+          const { id, ...orgData } = org
+          await SupabaseClientDB.createOrganization(orgData)
+          migrated++
+        } catch (error) {
+          console.error(`[v0] Migration error for ${org.name}:`, error)
+          errors.push(`${org.name}: ${(error as Error).message}`)
+        }
+      }
+
+      if (migrated > 0) {
+        // Clear localStorage after successful migration
+        localStorage.removeItem("demo_organizations")
+        await loadData()
+        alert(
+          `Migration réussie ! ${migrated} organisations migrées vers Supabase.${errors.length > 0 ? ` ${errors.length} erreurs.` : ""}`,
+        )
+      } else {
+        alert(`Migration échouée. Erreurs: ${errors.join(", ")}`)
+      }
+    } catch (error) {
+      console.error("[v0] Migration failed:", error)
+      alert(`Erreur de migration: ${(error as Error).message}`)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -407,6 +454,10 @@ export function Organizations() {
           <Button onClick={() => setShowDiagnostic(!showDiagnostic)} variant="outline" size="sm">
             <Database className="w-4 h-4 mr-2" />
             Diagnostic
+          </Button>
+          <Button onClick={migrateLocalStorageToSupabase} variant="outline" size="sm">
+            <Upload className="w-4 h-4 mr-2" />
+            Migrer vers Supabase
           </Button>
           <Button onClick={clearCache} variant="destructive" size="sm">
             <Trash2 className="w-4 h-4 mr-2" />

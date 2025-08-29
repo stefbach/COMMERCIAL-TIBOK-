@@ -107,7 +107,7 @@ export interface Contract {
   description?: string
   value?: number
   currency?: string
-  status?: "draft" | "sent" | "signed" | "cancelled" | "expired"
+  status?: "draft" | "sent" | "contrat_envoye" | "signed" | "cancelled" | "expired"
   signed_date?: string
   expiration_date?: string
   assigned_to?: string
@@ -202,12 +202,12 @@ export const PROSPECT_STATUS_LABELS = {
 export const CONTRACT_STATUS_LABELS = {
   draft: "Brouillon",
   sent: "Envoyé",
+  contrat_envoye: "Contrat Envoyé", // Added new contract sent status
   signed: "Signé",
   cancelled: "Annulé",
   expired: "Expiré",
 } as const
 
-// Ajout des constantes manquantes
 export const PRIORITY_LABELS = {
   low: "Basse",
   medium: "Moyenne",

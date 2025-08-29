@@ -360,44 +360,8 @@ export class SupabaseClientDB {
   static async createOrganization(orgData: Partial<Organization>): Promise<Organization> {
     console.log("[v0] Creating organization:", orgData.name)
 
-    // Check if we should use demo mode
-    const demoMode = await this.isDemoMode()
-    console.log("[v0] Demo mode for organization creation:", demoMode)
-
-    if (demoMode) {
-      console.log("[v0] Using localStorage for organization creation")
-      const organizations = this.getDemoData("organizations")
-      const newOrg: Organization = {
-        id: this.generateId(),
-        name: orgData.name || "",
-        industry: orgData.industry || "",
-        category: orgData.category || "",
-        region: orgData.region || "",
-        zone_geographique: orgData.zone_geographique || "",
-        district: orgData.district || "",
-        city: orgData.city || "",
-        address: orgData.address || "",
-        secteur: orgData.secteur || "",
-        website: orgData.website || "",
-        nb_chambres: orgData.nb_chambres || 0,
-        phone: orgData.phone || "",
-        email: orgData.email || "",
-        notes: orgData.notes || "",
-        contact_principal: orgData.contact_principal || "",
-        contact_fonction: orgData.contact_fonction || "",
-        size: orgData.size || "",
-        country: orgData.country || "Maurice",
-        status: orgData.status || "Actif",
-        priority: orgData.priority || "Moyenne",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      organizations.push(newOrg)
-      this.setDemoData("organizations", organizations)
-      console.log("[v0] Organization created in localStorage. Total organizations:", organizations.length)
-      return newOrg
-    }
+    const demoMode = false // Force Supabase usage
+    console.log("[v0] Forcing Supabase mode for organization creation")
 
     // Try Supabase with only columns that exist in the database
     try {
@@ -430,41 +394,15 @@ export class SupabaseClientDB {
       const { data, error } = await supabase.from("organizations").insert([supabaseData]).select().single()
 
       if (error) {
-        console.log("[v0] Supabase insert failed, falling back to demo mode:", error.message)
-        // Fallback to localStorage
-        const organizations = this.getDemoData("organizations")
-        const newOrg: Organization = {
-          id: this.generateId(),
-          ...orgData,
-          priority: orgData.priority || "Moyenne", // Keep priority in localStorage
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as Organization
-
-        organizations.push(newOrg)
-        this.setDemoData("organizations", organizations)
-        console.log("[v0] Fallback organization created. Total organizations:", organizations.length)
-        return newOrg
+        console.log("[v0] Supabase insert failed:", error.message)
+        throw error // Don't fallback, show the real error
       }
 
       console.log("[v0] Organization successfully created in Supabase")
       return { ...data, priority: orgData.priority || "Moyenne" } as Organization
     } catch (error) {
-      console.log("[v0] Supabase failed, falling back to demo mode:", error)
-      // Fallback to localStorage
-      const organizations = this.getDemoData("organizations")
-      const newOrg: Organization = {
-        id: this.generateId(),
-        ...orgData,
-        priority: orgData.priority || "Moyenne",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as Organization
-
-      organizations.push(newOrg)
-      this.setDemoData("organizations", organizations)
-      console.log("[v0] Fallback organization created. Total organizations:", organizations.length)
-      return newOrg
+      console.log("[v0] Supabase creation failed:", error)
+      throw error // Don't fallback, show the real error
     }
   }
 
@@ -1062,7 +1000,11 @@ export class SupabaseClientDB {
     const { data, error } = await supabase.from("contracts").select("*").order("created_date", { ascending: false })
 
     if (error) throw error
-    return data || []
+
+    return (data || []).map((contract) => ({
+      ...contract,
+      documents: typeof contract.documents === "string" ? JSON.parse(contract.documents) : contract.documents || [],
+    }))
   }
 
   static async createContract(contract: Omit<Contract, "id" | "createdDate" | "updatedDate">): Promise<Contract> {
@@ -1083,7 +1025,18 @@ export class SupabaseClientDB {
     const { data, error } = await supabase
       .from("contracts")
       .insert({
-        ...contract,
+        title: contract.title,
+        description: contract.description,
+        organization_id: contract.organization_id || contract.organizationId,
+        contact_id: contract.contact_id || contract.contactId,
+        value: contract.value,
+        currency: contract.currency,
+        status: contract.status,
+        assigned_to: contract.assigned_to || contract.assignedTo, // Handle both snake_case and camelCase
+        expiration_date: contract.expiration_date || contract.expirationDate,
+        signed_date: contract.signed_date || contract.signedDate,
+        notes: contract.notes,
+        documents: contract.documents || [],
         created_date: new Date().toISOString(),
         updated_date: new Date().toISOString(),
       })
@@ -1091,7 +1044,15 @@ export class SupabaseClientDB {
       .single()
 
     if (error) throw error
-    return data
+
+    return {
+      ...data,
+      documents: Array.isArray(data.documents)
+        ? data.documents
+        : typeof data.documents === "string"
+          ? JSON.parse(data.documents)
+          : [],
+    }
   }
 
   static async updateContract(id: string, updates: Partial<Contract>): Promise<Contract> {
@@ -1111,15 +1072,20 @@ export class SupabaseClientDB {
     }
 
     const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("contracts")
-      .update({ ...updates, updated_date: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
+
+    const updateData = { ...updates, updated_date: new Date().toISOString() }
+    if (updateData.documents) {
+      updateData.documents = JSON.stringify(updateData.documents)
+    }
+
+    const { data, error } = await supabase.from("contracts").update(updateData).eq("id", id).select().single()
 
     if (error) throw error
-    return data
+
+    return {
+      ...data,
+      documents: typeof data.documents === "string" ? JSON.parse(data.documents) : data.documents || [],
+    }
   }
 
   static async deleteContract(id: string): Promise<void> {

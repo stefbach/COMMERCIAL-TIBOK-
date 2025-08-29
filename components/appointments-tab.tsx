@@ -326,6 +326,36 @@ export function AppointmentsTab({ contacts, organizations }: AppointmentsTabProp
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
+                      {organization && (
+                        <div className="mb-3 p-2 bg-blue-600 text-white rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-5 w-5" />
+                            <span className="text-xl font-bold">{organization.name}</span>
+                            <Badge className="bg-blue-500 text-white border-blue-400">Structure</Badge>
+                          </div>
+                        </div>
+                      )}
+
+                      {!organization && appointment.organizationId && (
+                        <div className="mb-3 p-2 bg-orange-600 text-white rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-5 w-5" />
+                            <span className="text-xl font-bold">
+                              {appointment.organizationId === "demo-1"
+                                ? "Hôtel Démo Maurice"
+                                : appointment.organizationId === "org1"
+                                  ? "Le Grand Palace"
+                                  : appointment.organizationId === "org2"
+                                    ? "Hôtel Tropical"
+                                    : appointment.organizationId === "org3"
+                                      ? "Resort Paradise"
+                                      : `Structure ${appointment.organizationId}`}
+                            </span>
+                            <Badge className="bg-orange-500 text-white border-orange-400">Fiche incomplète</Badge>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-2 mb-2">
                         {getTypeIcon(appointment.type)}
                         <h3 className="font-semibold">{appointment.title}</h3>
@@ -353,12 +383,144 @@ export function AppointmentsTab({ contacts, organizations }: AppointmentsTabProp
                           </div>
                         )}
 
+                        {organization ? (
+                          <div className="bg-blue-50 p-3 rounded-lg mt-3 border border-blue-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-blue-900 flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                <span className="text-base">Informations détaillées</span>
+                              </h4>
+                              <Badge variant="outline" className="text-xs bg-green-100 text-green-800">
+                                ✓ Fiche complète
+                              </Badge>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-800">
+                              {organization.phone && (
+                                <div className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  <span>{organization.phone}</span>
+                                </div>
+                              )}
+
+                              {organization.email && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-blue-600">@</span>
+                                  <span>{organization.email}</span>
+                                </div>
+                              )}
+
+                              {(organization.city || organization.region || organization.district) && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  <span>
+                                    {organization.city}
+                                    {organization.district && `, ${organization.district}`}
+                                    {organization.region && ` (${organization.region})`}
+                                  </span>
+                                </div>
+                              )}
+
+                              {organization.website && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-blue-600">🌐</span>
+                                  <span className="truncate">{organization.website}</span>
+                                </div>
+                              )}
+
+                              {organization.secteur && (
+                                <div className="col-span-full">
+                                  <Badge variant="secondary" className="text-xs">
+                                    Secteur: {organization.secteur}
+                                  </Badge>
+                                </div>
+                              )}
+
+                              {organization.nb_chambres && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-blue-600">🏨</span>
+                                  <span>{organization.nb_chambres} chambres</span>
+                                </div>
+                              )}
+
+                              {organization.category && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-blue-600">⭐</span>
+                                  <span>{organization.category}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {organization.contact_principal && (
+                              <div className="mt-2 pt-2 border-t border-blue-200">
+                                <div className="text-xs text-blue-700">
+                                  <strong>Contact:</strong> {organization.contact_principal}
+                                  {organization.contact_fonction && ` (${organization.contact_fonction})`}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : appointment.organizationId ? (
+                          <div className="bg-orange-50 p-3 rounded-lg mt-3 border border-orange-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-orange-900 flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                <span className="text-base">Informations partielles</span>
+                              </h4>
+                              <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800">
+                                ⚠️ Fiche incomplète
+                              </Badge>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-orange-800">
+                              {appointment.city && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  <span>
+                                    {appointment.city}
+                                    {appointment.region && ` (${appointment.region})`}
+                                  </span>
+                                </div>
+                              )}
+
+                              {appointment.address && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  <span className="truncate">{appointment.address}</span>
+                                </div>
+                              )}
+
+                              {appointment.location && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-orange-600">📍</span>
+                                  <span className="truncate">{appointment.location}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="mt-2 pt-2 border-t border-orange-200">
+                              <div className="text-xs text-orange-700">
+                                <strong>Note:</strong> Les informations complètes de cette structure ne sont pas
+                                disponibles. Seules les données du rendez-vous sont affichées.
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-gray-50 p-3 rounded-lg mt-3 border border-gray-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Users className="h-4 w-4 text-gray-500" />
+                              <span className="font-semibold text-gray-700 text-lg">Aucune structure associée</span>
+                              <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600">
+                                Rendez-vous individuel
+                              </Badge>
+                            </div>
+                          </div>
+                        )}
+
                         {contact && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 mt-2">
                             <Users className="h-4 w-4" />
-                            <span>
-                              {contact.fullName} - {organization?.name}
-                            </span>
+                            <span>{contact.fullName}</span>
                           </div>
                         )}
 
