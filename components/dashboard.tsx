@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Building2, Calendar, FileCheck, CalendarClock, BarChart3, MapPin, Send } from "lucide-react"
+import { Building2, DollarSign, Users, Trophy } from 'lucide-react'
 import { SupabaseClientDB } from "@/lib/supabase-db"
 
 interface DashboardStats {
