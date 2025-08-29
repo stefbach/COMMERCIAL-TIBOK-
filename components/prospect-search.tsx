@@ -320,7 +320,7 @@ export function ProspectSearch({ contacts, organizations, onContactSelect, onFil
                       Voir détails
                     </Button>
                     <Button size="sm" variant="ghost" className="text-xs text-primary">
-                      <NotebookPen className="w-3 h-3 mr-1" />
+                      <Edit className="w-3 h-3 mr-1" />
                       Notes & RDV
                     </Button>
                   </div>
