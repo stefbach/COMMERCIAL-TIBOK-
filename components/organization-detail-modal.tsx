@@ -149,34 +149,32 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     }
   }
 
-  // FONCTION DE SAUVEGARDE CORRIGÉE
+  // FONCTION DE SAUVEGARDE SIMPLIFIÉE ET CORRECTE
   const handleSaveOrganization = async () => {
     if (!organization) return
     setLoading(true)
     
     try {
-      // Construction des données mises à jour avec mappage correct des champs
+      // Construction des données mises à jour
       const updatedData = {
         name: organizationForm.name.trim(),
-        industry: organizationForm.industry.trim(),
+        industry: organizationForm.industry.trim() || null,
         category: organizationForm.category || null,
         region: organizationForm.region || null,
-        zone_geographique: organizationForm.zone_geographique.trim(),
-        district: organizationForm.district.trim(),
-        city: organizationForm.city.trim(),
-        address: organizationForm.address.trim(),
-        secteur: organizationForm.secteur.trim(),
-        website: organizationForm.website.trim(),
+        zone_geographique: organizationForm.zone_geographique.trim() || null,
+        district: organizationForm.district.trim() || null,
+        city: organizationForm.city.trim() || null,
+        address: organizationForm.address.trim() || null,
+        secteur: organizationForm.secteur.trim() || null,
+        website: organizationForm.website.trim() || null,
         nb_chambres: organizationForm.nb_chambres ? Number.parseInt(organizationForm.nb_chambres) : null,
-        phone: organizationForm.phone.trim(),
-        email: organizationForm.email.trim(),
-        contact_principal: organizationForm.contact_principal.trim(),
-        contact_fonction: organizationForm.contact_fonction.trim(),
+        phone: organizationForm.phone.trim() || null,
+        email: organizationForm.email.trim() || null,
+        contact_principal: organizationForm.contact_principal.trim() || null,
+        contact_fonction: organizationForm.contact_fonction.trim() || null,
         status: organizationForm.status,
         priority: organizationForm.priority,
-        notes: organizationForm.notes.trim(),
-        // Ajouter explicitement la date de mise à jour
-        updated_at: new Date().toISOString(),
+        notes: organizationForm.notes.trim() || null,
       }
       
       // Validation des données obligatoires
@@ -185,14 +183,15 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         return
       }
       
+      // Mise à jour avec support ID number et string
       await SupabaseClientDB.updateOrganization(organization.id, updatedData)
-      
       toast.success("Organisation mise à jour avec succès")
       
-      // Forcer le rechargement des données
+      // Rechargement des données
       await onUpdate()
       
     } catch (error) {
+      console.error("Error updating organization:", error)
       toast.error(`Erreur lors de la mise à jour: ${(error as Error).message}`)
     } finally {
       setLoading(false)
