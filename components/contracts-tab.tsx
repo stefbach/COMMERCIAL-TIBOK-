@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, FileText, Trash2, Edit, Plus, Upload, Download, X } from "lucide-react"
+import { Calendar, FileText, Trash2, Edit, Plus, Upload, Download, X, AlertTriangle } from "lucide-react"
 import { type Contract, type Organization, type Contact } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
 
@@ -18,76 +18,87 @@ interface ContractsTabProps {
   contacts: Contact[]
 }
 
-// Statuts simplifiés
-const CONTRACT_STATUS_LABELS = {
-  "envoye": "Envoyé",
-  "signe": "Signé", 
-  "annule": "Annulé"
+// ✅ STATUTS COHÉRENTS ET SIMPLIFIÉS
+const CONTRACT_STATUS = {
+  envoye: { label: "Envoyé", color: "bg-blue-100 text-blue-800" },
+  signe: { label: "Signé", color: "bg-green-100 text-green-800" },
+  annule: { label: "Annulé", color: "bg-red-100 text-red-800" }
 } as const
 
-type ContractStatus = keyof typeof CONTRACT_STATUS_LABELS
+type ContractStatus = keyof typeof CONTRACT_STATUS
 
+// ✅ INTERFACE DE FORMULAIRE SIMPLE
+interface ContractFormData {
+  description: string
+  organizationId: string
+  status: ContractStatus
+  sentDate: string
+  signatureDate: string
+}
+
+// ✅ COMPOSANT RECODÉ COMPLÈTEMENT
 export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
+  // ============ STATE ============
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
-  const [showMigrationAlert, setShowMigrationAlert] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   
   const [filters, setFilters] = useState({
     status: "all",
     organization: "all",
   })
   
-  const [formData, setFormData] = useState({
+  // ✅ FORMULAIRE SIMPLIFIÉ ET COHÉRENT
+  const [formData, setFormData] = useState<ContractFormData>({
     description: "",
     organizationId: "",
-    status: "envoye" as ContractStatus,
+    status: "envoye",
     sentDate: "",
     signatureDate: "",
   })
-  
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
+  // ============ EFFECTS ============
   useEffect(() => {
     loadContracts()
-    if (organizations.length === 0) {
-      setShowMigrationAlert(true)
-    }
-  }, [organizations])
+  }, [])
 
+  // ============ DATA LOADING ============
   const loadContracts = async () => {
     try {
-      console.log("[v0] Loading contracts...")
+      console.log("[CONTRACTS] Loading contracts...")
+      setLoading(true)
       const data = await SupabaseClientDB.getContracts()
-      console.log("[v0] Contracts loaded:", data)
+      console.log("[CONTRACTS] Contracts loaded:", data.length)
       setContracts(data)
     } catch (error) {
-      console.error("[v0] Error loading contracts:", error)
+      console.error("[CONTRACTS] Error loading contracts:", error)
     } finally {
       setLoading(false)
     }
   }
 
+  // ============ FORM HANDLERS ============
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!formData.organizationId) {
+      alert("Erreur: Organisation obligatoire.")
+      return
+    }
+
     setLoading(true)
 
     try {
-      if (!formData.organizationId) {
-        alert("Erreur: Organisation obligatoire.")
-        setLoading(false)
-        return
-      }
+      console.log("[CONTRACTS] Submitting contract:", formData)
 
-      console.log("[v0] Creating contract with data:", formData)
-
+      // ✅ GESTION DES FICHIERS SIMPLIFIÉE
       const documents = await Promise.all(
         selectedFiles.map(async (file) => {
           let base64Data = (file as any).base64
 
           if (!base64Data) {
-            // Convert file to base64 if not already done
             base64Data = await new Promise((resolve) => {
               const reader = new FileReader()
               reader.onload = () => resolve(reader.result)
@@ -105,36 +116,42 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         }),
       )
 
-      const contractData: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
+      // ✅ DONNÉES COHÉRENTES EN camelCase
+      const contractInput: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
+        title: `Contrat - ${getOrganizationName(formData.organizationId)}`,
         description: formData.description,
-        organization_id: formData.organizationId,
-        contact_id: null, // Supprimé
-        status: formData.status,
-        assigned_to: "", // Supprimé
-        notes: "", // Supprimé
-        title: "", // Supprimé
+        organizationId: formData.organizationId,        // ✅ camelCase
+        contactId: null,
         value: 0,
-        documents: documents,
-        signed_date: formData.status === "signe" && formData.signatureDate 
+        currency: "EUR",
+        status: formData.status,
+        assignedTo: "",                                 // ✅ camelCase
+        expirationDate: undefined,
+        signedDate: formData.status === "signe" && formData.signatureDate   // ✅ camelCase
           ? new Date(formData.signatureDate) 
           : undefined,
-        sent_date: formData.sentDate ? new Date(formData.sentDate) : undefined,
+        sentDate: formData.sentDate ? new Date(formData.sentDate) : undefined,  // ✅ camelCase
+        notes: "",
+        documents: documents,
       }
 
-      console.log("[v0] Contract data being sent:", contractData)
+      console.log("[CONTRACTS] Contract input prepared:", contractInput)
 
       if (editingContract) {
-        await SupabaseClientDB.updateContract(editingContract.id, contractData)
-        console.log("[v0] Contract updated successfully")
+        console.log("[CONTRACTS] Updating existing contract:", editingContract.id)
+        await SupabaseClientDB.updateContract(editingContract.id, contractInput)
       } else {
-        await SupabaseClientDB.createContract(contractData)
-        console.log("[v0] Contract created successfully")
+        console.log("[CONTRACTS] Creating new contract...")
+        await SupabaseClientDB.createContract(contractInput)
       }
 
       await loadContracts()
       resetForm()
+      console.log("[CONTRACTS] ✅ Contract saved successfully")
+      
     } catch (error) {
-      console.error("[v0] Error saving contract:", error)
+      console.error("[CONTRACTS] ❌ Error saving contract:", error)
+      alert(`Erreur lors de l'enregistrement: ${(error as Error).message}`)
     } finally {
       setLoading(false)
     }
@@ -144,19 +161,55 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce contrat ?")) return
 
     try {
+      console.log("[CONTRACTS] Deleting contract:", contractId)
       await SupabaseClientDB.deleteContract(contractId)
-      console.log("[v0] Contract deleted successfully")
       await loadContracts()
+      console.log("[CONTRACTS] ✅ Contract deleted successfully")
     } catch (error) {
-      console.error("[v0] Error deleting contract:", error)
+      console.error("[CONTRACTS] ❌ Error deleting contract:", error)
+      alert(`Erreur lors de la suppression: ${(error as Error).message}`)
     }
   }
 
+  const startEdit = (contract: Contract) => {
+    console.log("[CONTRACTS] Starting edit for contract:", contract.id)
+    setEditingContract(contract)
+    
+    // ✅ MAPPING COHÉRENT pour l'édition
+    setFormData({
+      description: contract.description || "",
+      organizationId: contract.organizationId || "",     // ✅ cohérent
+      status: (contract.status as ContractStatus) || "envoye",
+      sentDate: contract.sentDate                        // ✅ cohérent
+        ? new Date(contract.sentDate).toISOString().split("T")[0] 
+        : "",
+      signatureDate: contract.signedDate                 // ✅ cohérent
+        ? new Date(contract.signedDate).toISOString().split("T")[0] 
+        : "",
+    })
+    
+    setSelectedFiles([])
+    setShowForm(true)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      description: "",
+      organizationId: "",
+      status: "envoye",
+      sentDate: "",
+      signatureDate: "",
+    })
+    setSelectedFiles([])
+    setShowForm(false)
+    setEditingContract(null)
+  }
+
+  // ============ FILE HANDLERS ============
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
     const fileArray = Array.from(files)
-
     const processedFiles = await Promise.all(
       fileArray.map(async (file) => {
         return new Promise<File>((resolve) => {
@@ -178,66 +231,6 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const resetForm = () => {
-    setFormData({
-      description: "",
-      organizationId: "",
-      status: "envoye",
-      sentDate: "",
-      signatureDate: "",
-    })
-    setSelectedFiles([])
-    setShowForm(false)
-    setEditingContract(null)
-  }
-
-  const startEdit = (contract: Contract) => {
-    setEditingContract(contract)
-    setFormData({
-      description: contract.description || "",
-      organizationId: contract.organizationId || "",
-      status: (contract.status as ContractStatus) || "envoye",
-      sentDate: contract.sent_date ? contract.sent_date.toISOString().split("T")[0] : "",
-      signatureDate: contract.signedDate ? contract.signedDate.toISOString().split("T")[0] : "",
-    })
-    setSelectedFiles([])
-    setShowForm(true)
-  }
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case "signe":
-        return "bg-green-100 text-green-800"
-      case "envoye":
-        return "bg-blue-100 text-blue-800"
-      case "annule":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const filteredContracts = contracts.filter((contract) => {
-    if (filters.status !== "all" && contract.status !== filters.status) return false
-    if (filters.organization !== "all" && contract.organizationId !== filters.organization) return false
-    return true
-  })
-
-  const getOrganizationName = (orgId: string) => {
-    if (!orgId) return "Aucune organisation"
-    const org = organizations.find((o) => o.id.toString() === orgId)
-    if (!org) {
-      console.log(`[v0] Organization not found for ID: ${orgId}`)
-      return `Organisation #${orgId.substring(0, 8)}...`
-    }
-    return org.name
-  }
-
-  const getOrganizationDetails = (orgId: string) => {
-    if (!orgId) return null
-    return organizations.find((o) => o.id.toString() === orgId)
-  }
-
   const downloadDocument = (doc: any) => {
     try {
       if (doc.data && doc.data.startsWith("data:")) {
@@ -247,60 +240,68 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        console.log("[v0] Document downloaded:", doc.name)
-      } else if (doc.url) {
-        const link = document.createElement("a")
-        link.href = doc.url
-        link.download = doc.name
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        console.log("[v0] Document downloaded (fallback):", doc.name)
+        console.log("[CONTRACTS] Document downloaded:", doc.name)
       } else {
         throw new Error("No valid download data found")
       }
     } catch (error) {
-      console.error("[v0] Error downloading document:", error)
-      alert(`Erreur lors du téléchargement de ${doc.name}. Le fichier pourrait ne plus être disponible.`)
+      console.error("[CONTRACTS] Error downloading document:", error)
+      alert(`Erreur lors du téléchargement de ${doc.name}`)
     }
   }
 
+  // ============ UTILITY FUNCTIONS ============
+  const getOrganizationName = (orgId: string) => {
+    if (!orgId) return "Aucune organisation"
+    const org = organizations.find((o) => o.id.toString() === orgId)
+    return org ? org.name : `Organisation #${orgId.substring(0, 8)}...`
+  }
+
+  const getOrganizationDetails = (orgId: string) => {
+    if (!orgId) return null
+    return organizations.find((o) => o.id.toString() === orgId)
+  }
+
+  const filteredContracts = contracts.filter((contract) => {
+    if (filters.status !== "all" && contract.status !== filters.status) return false
+    if (filters.organization !== "all" && contract.organizationId !== filters.organization) return false
+    return true
+  })
+
+  // ============ RENDER ============
   if (loading && contracts.length === 0) {
-    return <div className="p-4">Chargement des contrats...</div>
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Chargement des contrats...</div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      {showMigrationAlert && organizations.length === 0 && (
+      {/* ============ ALERT SI PAS D'ORGANISATIONS ============ */}
+      {organizations.length === 0 && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="text-orange-600">⚠️</div>
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
               <div>
                 <h3 className="font-semibold text-orange-800">Aucune organisation trouvée</h3>
                 <p className="text-sm text-orange-700">
-                  Les contrats doivent être liés à des organisations. Veuillez d'abord importer ou créer des
-                  organisations dans l'onglet "Organisations" avant de créer des contrats.
+                  Les contrats doivent être liés à des organisations. Créez d'abord des organisations.
                 </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2 border-orange-300 text-orange-700 hover:bg-orange-100 bg-transparent"
-                  onClick={() => setShowMigrationAlert(false)}
-                >
-                  Compris
-                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
+      {/* ============ HEADER ============ */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-blue-600">Gestion des Contrats</h2>
           <p className="text-gray-600">Gérez vos contrats et leur suivi</p>
-          <p className="text-sm text-blue-600">{organizations.length} organisation(s) disponible(s) pour liaison</p>
+          <p className="text-sm text-blue-600">{contracts.length} contrat(s) • {organizations.length} organisation(s)</p>
         </div>
         <Button
           onClick={() => setShowForm(true)}
@@ -312,6 +313,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         </Button>
       </div>
 
+      {/* ============ FILTRES ============ */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Filtres</CardTitle>
@@ -320,7 +322,10 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Statut</Label>
-              <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+              <Select 
+                value={filters.status} 
+                onValueChange={(value) => setFilters({ ...filters, status: value })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -355,10 +360,16 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         </CardContent>
       </Card>
 
+      {/* ============ FORMULAIRE ============ */}
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle>{editingContract ? "Modifier le Contrat" : "Nouveau Contrat"}</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              {editingContract ? "Modifier le Contrat" : "Nouveau Contrat"}
+              <Button variant="ghost" size="sm" onClick={resetForm}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -374,22 +385,13 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                       <SelectValue placeholder="Sélectionner une organisation" />
                     </SelectTrigger>
                     <SelectContent>
-                      {organizations.length === 0 ? (
-                        <SelectItem value="" disabled>
-                          Aucune organisation disponible
+                      {organizations.map((org) => (
+                        <SelectItem key={org.id} value={org.id.toString()}>
+                          {org.name}
                         </SelectItem>
-                      ) : (
-                        organizations.map((org) => (
-                          <SelectItem key={org.id} value={org.id.toString()}>
-                            {org.name}
-                          </SelectItem>
-                        ))
-                      )}
+                      ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Obligatoire : chaque contrat doit être lié à une organisation
-                  </p>
                 </div>
                 <div>
                   <Label htmlFor="status">Statut</Label>
@@ -407,6 +409,9 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="sentDate">Date d'envoi</Label>
                   <Input
@@ -426,6 +431,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                   />
                 </div>
               </div>
+
               <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -436,6 +442,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                   placeholder="Description du contrat..."
                 />
               </div>
+
               <div>
                 <Label>Documents du contrat</Label>
                 <div className="space-y-3">
@@ -453,6 +460,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                     </Button>
                   </div>
 
+                  {/* Fichiers sélectionnés */}
                   {selectedFiles.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Fichiers sélectionnés :</p>
@@ -471,6 +479,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                     </div>
                   )}
 
+                  {/* Documents existants */}
                   {editingContract && editingContract.documents && editingContract.documents.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Documents existants :</p>
@@ -493,9 +502,10 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                   )}
                 </div>
               </div>
+
               <div className="flex gap-2">
                 <Button type="submit" disabled={loading}>
-                  {editingContract ? "Mettre à jour" : "Créer"}
+                  {loading ? "Sauvegarde..." : editingContract ? "Mettre à jour" : "Créer"}
                 </Button>
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Annuler
@@ -506,75 +516,72 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         </Card>
       )}
 
+      {/* ============ LISTE DES CONTRATS ============ */}
       <div className="grid gap-4">
         {filteredContracts.length === 0 ? (
           <Card>
-            <CardContent className="p-6 text-center text-gray-500">Aucun contrat trouvé</CardContent>
+            <CardContent className="p-6 text-center text-gray-500">
+              {contracts.length === 0 
+                ? "Aucun contrat enregistré. Créez votre premier contrat !" 
+                : "Aucun contrat trouvé avec les filtres actuels."
+              }
+            </CardContent>
           </Card>
         ) : (
           filteredContracts.map((contract) => {
-            const organizationId = (contract as any).organization_id || contract.organizationId
-            const organization = getOrganizationDetails(organizationId)
+            const organization = getOrganizationDetails(contract.organizationId || "")
 
             return (
-              <Card key={contract.id}>
+              <Card key={contract.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
-                  {(() => {
-                    if (organization) {
-                      return (
-                        <div className="mb-4 p-4 bg-blue-600 text-white rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-6 w-6" />
-                            <div>
-                              <h2 className="text-2xl font-bold">{organization.name}</h2>
-                              {organization.industry && (
-                                <p className="text-blue-100 text-sm">Secteur: {organization.industry}</p>
-                              )}
-                              {organization.city && organization.region && (
-                                <p className="text-blue-100 text-sm">
-                                  📍 {organization.city}, {organization.region}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                  {/* En-tête Organisation */}
+                  {organization ? (
+                    <div className="mb-4 p-4 bg-blue-600 text-white rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-6 w-6" />
+                        <div>
+                          <h2 className="text-2xl font-bold">{organization.name}</h2>
+                          {organization.industry && (
+                            <p className="text-blue-100 text-sm">Secteur: {organization.industry}</p>
+                          )}
+                          {organization.city && organization.region && (
+                            <p className="text-blue-100 text-sm">
+                              📍 {organization.city}, {organization.region}
+                            </p>
+                          )}
                         </div>
-                      )
-                    } else {
-                      return (
-                        <div className="mb-4 p-4 bg-orange-500 text-white rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-6 w-6" />
-                            <div>
-                              <h2 className="text-2xl font-bold">{getOrganizationName(organizationId)}</h2>
-                              <p className="text-orange-100 text-sm">
-                                Organisation non trouvée dans la base de données
-                              </p>
-                              <p className="text-orange-100 text-xs">ID: {organizationId}</p>
-                            </div>
-                          </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-4 p-4 bg-orange-500 text-white rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="h-6 w-6" />
+                        <div>
+                          <h2 className="text-xl font-bold">Organisation introuvable</h2>
+                          <p className="text-orange-100 text-sm">ID: {contract.organizationId}</p>
                         </div>
-                      )
-                    }
-                  })()}
+                      </div>
+                    </div>
+                  )}
 
+                  {/* Contenu du contrat */}
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <Badge className={getStatusBadgeColor(contract.status)}>
-                          {CONTRACT_STATUS_LABELS[contract.status as ContractStatus] || contract.status}
+                        <Badge className={CONTRACT_STATUS[contract.status as ContractStatus]?.color || "bg-gray-100 text-gray-800"}>
+                          {CONTRACT_STATUS[contract.status as ContractStatus]?.label || contract.status}
                         </Badge>
+                        {contract.title && (
+                          <span className="text-lg font-semibold">{contract.title}</span>
+                        )}
                       </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          <span className="text-blue-700 font-medium">
-                            Organisation: {getOrganizationName(organizationId)}
-                          </span>
-                        </div>
-                        {contract.sent_date && (
+                        {/* ✅ AFFICHAGE COHÉRENT DES DATES */}
+                        {contract.sentDate && (
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            <span>Envoyé le: {new Date(contract.sent_date).toLocaleDateString("fr-FR")}</span>
+                            <span>Envoyé le: {new Date(contract.sentDate).toLocaleDateString("fr-FR")}</span>
                           </div>
                         )}
                         {contract.signedDate && (
@@ -585,8 +592,11 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                         )}
                       </div>
 
-                      {contract.description && <p className="mt-2 text-sm text-gray-700">{contract.description}</p>}
+                      {contract.description && (
+                        <p className="mt-2 text-sm text-gray-700">{contract.description}</p>
+                      )}
 
+                      {/* Documents */}
                       {contract.documents && contract.documents.length > 0 && (
                         <div className="mt-3 p-3 bg-gray-50 rounded">
                           <p className="text-sm font-medium mb-2">Documents ({contract.documents.length}) :</p>
@@ -616,6 +626,8 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                         </div>
                       )}
                     </div>
+
+                    {/* Actions */}
                     <div className="flex gap-2 ml-4">
                       <Button variant="outline" size="sm" onClick={() => startEdit(contract)}>
                         <Edit className="h-4 w-4" />
