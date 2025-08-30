@@ -47,8 +47,8 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
   const [organizationForm, setOrganizationForm] = useState({
     name: "",
     industry: "",
-    category: "",
-    region: "",
+    category: undefined as string | undefined,
+    region: undefined as string | undefined,
     zone_geographique: "",
     district: "",
     city: "",
@@ -89,8 +89,8 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
       setOrganizationForm({
         name: organization.name || "",
         industry: organization.industry || "",
-        category: organization.category || "",
-        region: organization.region || "",
+        category: organization.category && organization.category.trim() ? organization.category : undefined,
+        region: organization.region && organization.region.trim() ? organization.region : undefined,
         zone_geographique: organization.zone_geographique || "",
         district: organization.district || "",
         city: organization.city || "",
@@ -159,8 +159,8 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
       const updatedData = {
         name: organizationForm.name.trim(),
         industry: organizationForm.industry.trim(),
-        category: organizationForm.category,
-        region: organizationForm.region,
+        category: organizationForm.category || null,
+        region: organizationForm.region || null,
         zone_geographique: organizationForm.zone_geographique.trim(),
         district: organizationForm.district.trim(),
         city: organizationForm.city.trim(),
@@ -503,10 +503,9 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                   onValueChange={(value) => setOrganizationForm({ ...organizationForm, category: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
+                    <SelectValue placeholder="Sélectionner une catégorie" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucune</SelectItem>
                     <SelectItem value="1 étoile">1 étoile</SelectItem>
                     <SelectItem value="2 étoiles">2 étoiles</SelectItem>
                     <SelectItem value="3 étoiles">3 étoiles</SelectItem>
@@ -544,10 +543,9 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                   onValueChange={(value) => setOrganizationForm({ ...organizationForm, region: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
+                    <SelectValue placeholder="Sélectionner une région" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucune</SelectItem>
                     <SelectItem value="Nord">Nord</SelectItem>
                     <SelectItem value="Sud">Sud</SelectItem>
                     <SelectItem value="Est">Est</SelectItem>
