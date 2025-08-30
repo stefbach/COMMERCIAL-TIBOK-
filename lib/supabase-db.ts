@@ -11,7 +11,7 @@ export interface Profile {
   updated_at: string
 }
 
-// Client-side database operations
+// Client-side database operations - VERSION RECODÉE ET COHÉRENTE
 export class SupabaseClientDB {
   private static getClient() {
     return createClient()
@@ -21,75 +21,69 @@ export class SupabaseClientDB {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    console.log("[v0] Checking demo mode - URL:", !!url, "KEY:", !!key)
+    console.log("[CRM] Checking demo mode - URL:", !!url, "KEY:", !!key)
 
     if (!url || !key || url.trim() === "" || key.trim() === "") {
-      console.log("[v0] Missing Supabase environment variables, using demo mode")
+      console.log("[CRM] Missing Supabase environment variables, using demo mode")
       return true
     }
 
     try {
       const client = this.getClient()
-      const {
-        data: { user },
-      } = await client.auth.getUser()
-      console.log("[v0] Auth check - User:", !!user)
+      const { data: { user } } = await client.auth.getUser()
+      console.log("[CRM] Auth check - User:", !!user)
 
-      // Test database connection
       const { data, error } = await client.from("organizations").select("count").limit(1)
       if (error) {
-        console.log("[v0] Database connection failed, using demo mode:", error.message)
+        console.log("[CRM] Database connection failed, using demo mode:", error.message)
         return true
       }
 
-      console.log("[v0] Supabase connection successful, using database mode")
+      console.log("[CRM] Supabase connection successful, using database mode")
       return false
     } catch (error) {
-      console.log("[v0] Connection test failed, using demo mode:", error)
+      console.log("[CRM] Connection test failed, using demo mode:", error)
       return true
     }
   }
 
-  // Organizations
+  // ============ ORGANIZATIONS - VERSION RECODÉE ============
   static async getOrganizations(): Promise<Organization[]> {
-    console.log("[v0] Loading organizations...")
+    console.log("[CRM] Loading organizations...")
 
-    // Check if we should use demo mode
     if (await this.isDemoMode()) {
-      console.log("[v0] Using demo mode for organizations")
+      console.log("[CRM] Using demo mode for organizations")
       const demoOrgs = this.getDemoData("organizations")
-      console.log("[v0] Demo organizations loaded:", demoOrgs.length)
+      console.log("[CRM] Demo organizations loaded:", demoOrgs.length)
       return demoOrgs
     }
 
     try {
-      console.log("[v0] Using Supabase for organizations")
+      console.log("[CRM] Using Supabase for organizations")
       const supabase = this.getClient()
-      const { data, error } = await supabase.from("organizations").select("*").order("created_at", { ascending: false })
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("*")
+        .order("created_at", { ascending: false })
 
       if (error) {
-        console.log("[v0] Supabase error, falling back to demo mode:", error.message)
-        const demoOrgs = this.getDemoData("organizations")
-        console.log("[v0] Fallback organizations loaded:", demoOrgs.length)
-        return demoOrgs
+        console.log("[CRM] Supabase error, falling back to demo mode:", error.message)
+        return this.getDemoData("organizations")
       }
 
-      console.log("[v0] Supabase organizations loaded:", data?.length || 0)
+      console.log("[CRM] Supabase organizations loaded:", data?.length || 0)
       return data || []
     } catch (error) {
-      console.log("[v0] Supabase failed, falling back to demo mode:", error)
-      const demoOrgs = this.getDemoData("organizations")
-      console.log("[v0] Fallback organizations loaded:", demoOrgs.length)
-      return demoOrgs
+      console.log("[CRM] Supabase failed, falling back to demo mode:", error)
+      return this.getDemoData("organizations")
     }
   }
 
   static async createOrganization(orgData: Partial<Organization>): Promise<Organization> {
-    console.log("[v0] Creating organization:", orgData.name)
+    console.log("[CRM] Creating organization:", orgData.name)
 
-    // Check demo mode first
     if (await this.isDemoMode()) {
-      console.log("[v0] Using demo mode for organization creation")
+      console.log("[CRM] Using demo mode for organization creation")
       const newOrg: Organization = {
         id: parseInt(this.generateId()),
         name: orgData.name || "",
@@ -110,22 +104,22 @@ export class SupabaseClientDB {
         contact_fonction: orgData.contact_fonction || "",
         size: orgData.size || "",
         country: orgData.country || "Maurice",
-        status: orgData.status || "Actif",
-        priority: orgData.priority || "Moyenne",
+        status: orgData.status || "Active",
+        priority: orgData.priority || "Medium",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         activityType: orgData.industry || "",
       }
+      
       const organizations = this.getDemoData("organizations")
       organizations.unshift(newOrg)
       this.setDemoData("organizations", organizations)
+      console.log("[CRM] Organization created in demo mode:", newOrg.id)
       return newOrg
     }
 
-    // Try Supabase
     try {
       const supabase = this.getClient()
-
       const supabaseData = {
         name: orgData.name || "",
         industry: orgData.industry || "",
@@ -145,35 +139,38 @@ export class SupabaseClientDB {
         contact_fonction: orgData.contact_fonction || "",
         size: orgData.size || "",
         country: orgData.country || "Maurice",
-        status: orgData.status || "Actif",
+        status: orgData.status || "Active",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
 
-      const { data, error } = await supabase.from("organizations").insert([supabaseData]).select().single()
+      const { data, error } = await supabase
+        .from("organizations")
+        .insert([supabaseData])
+        .select()
+        .single()
 
-      if (error) {
-        console.log("[v0] Supabase insert failed:", error.message)
-        throw error
-      }
+      if (error) throw error
 
-      console.log("[v0] Organization successfully created in Supabase")
-      return { ...data, priority: orgData.priority || "Moyenne", activityType: data.industry } as Organization
+      console.log("[CRM] Organization created in Supabase:", data.id)
+      return { 
+        ...data, 
+        priority: orgData.priority || "Medium", 
+        activityType: data.industry 
+      } as Organization
     } catch (error) {
-      console.log("[v0] Supabase creation failed:", error)
+      console.error("[CRM] Supabase creation failed:", error)
       throw error
     }
   }
 
-  // ✅ CORRECTION DÉFINITIVE : Support des ID number ET string
+  // ✅ VERSION SIMPLIFIÉE ET ROBUSTE
   static async updateOrganization(id: number | string, updates: Partial<Organization>): Promise<Organization> {
-    console.log("[v0] updateOrganization called with ID:", id, typeof id)
+    console.log("[CRM] Updating organization - ID:", id, "Type:", typeof id)
     
     if (await this.isDemoMode()) {
-      console.log("[v0] Using demo mode for organization update")
+      console.log("[CRM] Using demo mode for organization update")
       const organizations = this.getDemoData("organizations")
-      
-      // Conversion de l'ID pour la comparaison en mode démo
       const searchId = typeof id === 'string' ? parseInt(id) : id
       const index = organizations.findIndex((org: Organization) => org.id === searchId)
       
@@ -184,17 +181,14 @@ export class SupabaseClientDB {
           updated_at: new Date().toISOString() 
         }
         this.setDemoData("organizations", organizations)
-        console.log("[v0] Organization updated in demo mode")
+        console.log("[CRM] Organization updated in demo mode")
         return organizations[index]
       }
       throw new Error("Organization not found in demo data")
     }
 
-    console.log("[v0] Using Supabase for organization update")
     try {
       const supabase = this.getClient()
-      
-      // Pour Supabase, on utilise directement l'ID (qui devrait être un UUID string)
       const supabaseId = typeof id === 'number' ? id.toString() : id
       
       const { data, error } = await supabase
@@ -204,22 +198,18 @@ export class SupabaseClientDB {
         .select()
         .single()
 
-      if (error) {
-        console.error("[v0] Supabase update failed:", error)
-        throw error
-      }
+      if (error) throw error
       
-      console.log("[v0] Organization updated in Supabase successfully")
+      console.log("[CRM] Organization updated in Supabase successfully")
       return data
     } catch (error) {
-      console.error("[v0] Supabase update error:", error)
+      console.error("[CRM] Organization update failed:", error)
       throw error
     }
   }
 
-  // ✅ CORRECTION DÉFINITIVE : Support des ID number ET string
   static async deleteOrganization(id: number | string): Promise<void> {
-    console.log("[v0] deleteOrganization called with ID:", id, typeof id)
+    console.log("[CRM] Deleting organization - ID:", id)
     
     if (await this.isDemoMode()) {
       const organizations = this.getDemoData("organizations")
@@ -232,638 +222,237 @@ export class SupabaseClientDB {
     const supabase = this.getClient()
     const supabaseId = typeof id === 'number' ? id.toString() : id
     const { error } = await supabase.from("organizations").delete().eq("id", supabaseId)
-
     if (error) throw error
   }
 
-  // Contacts
-  static async getContacts(): Promise<Contact[]> {
-    if (await this.isDemoMode()) {
-      return this.getDemoData("contacts")
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("contacts").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async createContact(contact: Omit<Contact, "id">): Promise<Contact> {
-    if (await this.isDemoMode()) {
-      const newContact: Contact = {
-        ...contact,
-        id: this.generateId(),
-      }
-      const contacts = this.getDemoData("contacts")
-      contacts.unshift(newContact)
-      this.setDemoData("contacts", contacts)
-      return newContact
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("contacts").insert(contact).select().single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async getContactsByOrganization(organizationId: number | string): Promise<Contact[]> {
-    if (await this.isDemoMode()) {
-      const contacts = this.getDemoData("contacts")
-      const searchId = typeof organizationId === 'string' ? parseInt(organizationId) : organizationId
-      return contacts.filter((contact: Contact) => contact.organization_id === searchId)
-    }
-
-    const supabase = this.getClient()
-    const supabaseId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
-    const { data, error } = await supabase
-      .from("contacts")
-      .select("*")
-      .eq("organization_id", supabaseId)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async updateContact(id: string, updates: Partial<Contact>): Promise<Contact> {
-    console.log("[v0] Updating contact:", id, "with updates:", updates)
-
-    if (await this.isDemoMode()) {
-      console.log("[v0] Using demo mode for contact update")
-      const contacts = this.getDemoData("contacts")
-      const index = contacts.findIndex((contact: Contact) => contact.id === id)
-      if (index !== -1) {
-        contacts[index] = { ...contacts[index], ...updates, updated_at: new Date().toISOString() }
-        this.setDemoData("contacts", contacts)
-        return contacts[index]
-      }
-      throw new Error("Contact not found")
-    }
-
-    console.log("[v0] Using Supabase for contact update")
-    try {
-      const supabase = this.getClient()
-      const { data, error } = await supabase
-        .from("contacts")
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .select()
-        .single()
-
-      if (error) throw error
-      console.log("[v0] Contact updated successfully:", data)
-      return data
-    } catch (error) {
-      console.error("[v0] Supabase update failed, falling back to demo mode:", error)
-      // Fallback to demo mode if Supabase fails
-      const contacts = this.getDemoData("contacts")
-      const index = contacts.findIndex((contact: Contact) => contact.id === id)
-      if (index !== -1) {
-        contacts[index] = { ...contacts[index], ...updates, updated_at: new Date().toISOString() }
-        this.setDemoData("contacts", contacts)
-        return contacts[index]
-      }
-      throw new Error("Contact not found")
-    }
-  }
-
-  static async deleteContact(id: string): Promise<void> {
-    if (await this.isDemoMode()) {
-      const contacts = this.getDemoData("contacts")
-      const filtered = contacts.filter((contact: Contact) => contact.id !== id)
-      this.setDemoData("contacts", filtered)
-      return
-    }
-
-    const supabase = this.getClient()
-    const { error } = await supabase.from("contacts").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // Deals
-  static async getDeals(): Promise<Deal[]> {
-    if (await this.isDemoMode()) {
-      return this.getDemoData("deals")
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("deals").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async createDeal(deal: Omit<Deal, "id" | "created_at" | "updated_at" | "created_by">): Promise<Deal> {
-    if (await this.isDemoMode()) {
-      const newDeal: Deal = {
-        ...deal,
-        id: this.generateId(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      const deals = this.getDemoData("deals")
-      deals.unshift(newDeal)
-      this.setDemoData("deals", deals)
-      return newDeal
-    }
-
-    const supabase = this.getClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("User not authenticated")
-
-    const { data, error } = await supabase
-      .from("deals")
-      .insert({ ...deal, created_by: user.id })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async updateDeal(id: string, updates: Partial<Deal>): Promise<Deal> {
-    if (await this.isDemoMode()) {
-      const deals = this.getDemoData("deals")
-      const index = deals.findIndex((deal: Deal) => deal.id === id)
-      if (index !== -1) {
-        deals[index] = { ...deals[index], ...updates, updated_at: new Date().toISOString() }
-        this.setDemoData("deals", deals)
-        return deals[index]
-      }
-      throw new Error("Deal not found")
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("deals")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async deleteDeal(id: string): Promise<void> {
-    if (await this.isDemoMode()) {
-      const deals = this.getDemoData("deals")
-      const filtered = deals.filter((deal: Deal) => deal.id !== id)
-      this.setDemoData("deals", filtered)
-      return
-    }
-
-    const supabase = this.getClient()
-    const { error } = await supabase.from("deals").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // Activities
-  static async getActivities(): Promise<Activity[]> {
-    if (await this.isDemoMode()) {
-      return this.getDemoData("activities")
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("activities").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async createActivity(
-    activity: Omit<Activity, "id" | "created_at" | "updated_at" | "created_by">,
-  ): Promise<Activity> {
-    if (await this.isDemoMode()) {
-      const newActivity: Activity = {
-        ...activity,
-        id: this.generateId(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      const activities = this.getDemoData("activities")
-      activities.unshift(newActivity)
-      this.setDemoData("activities", activities)
-      return newActivity
-    }
-
-    const supabase = this.getClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("User not authenticated")
-
-    const { data, error } = await supabase
-      .from("activities")
-      .insert({ ...activity, created_by: user.id })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async updateActivity(id: string, updates: Partial<Activity>): Promise<Activity> {
-    if (await this.isDemoMode()) {
-      const activities = this.getDemoData("activities")
-      const index = activities.findIndex((activity: Activity) => activity.id === id)
-      if (index !== -1) {
-        activities[index] = { ...activities[index], ...updates, updated_at: new Date().toISOString() }
-        this.setDemoData("activities", activities)
-        return activities[index]
-      }
-      throw new Error("Activity not found")
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("activities")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async deleteActivity(id: string): Promise<void> {
-    if (await this.isDemoMode()) {
-      const activities = this.getDemoData("activities")
-      const filtered = activities.filter((activity: Activity) => activity.id !== id)
-      this.setDemoData("activities", filtered)
-      return
-    }
-
-    const supabase = this.getClient()
-    const { error } = await supabase.from("activities").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // Appointments
-  static async getAppointments(): Promise<any[]> {
-    console.log("[v0] getAppointments called")
-
-    if (await this.isDemoMode()) {
-      console.log("[v0] Using demo mode for appointments loading")
-      const appointments = this.getDemoData("appointments")
-      console.log("[v0] Demo appointments loaded:", appointments.length)
-      return appointments
-    }
-
-    try {
-      console.log("[v0] Using Supabase for appointments loading")
-      const supabase = this.getClient()
-      const { data, error } = await supabase.from("appointments").select("*").order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      console.log("[v0] Supabase appointments loaded:", data?.length || 0)
-
-      if (!data || data.length === 0) {
-        console.log("[v0] Supabase returned empty data, checking localStorage fallback")
-        const fallbackData = this.getDemoData("appointments")
-        console.log("[v0] Fallback appointments loaded:", fallbackData.length)
-        return fallbackData
-      }
-
-      return data || []
-    } catch (error) {
-      console.error("[v0] Supabase loading failed, falling back to demo mode:", error)
-      const appointments = this.getDemoData("appointments")
-      console.log("[v0] Fallback appointments loaded:", appointments.length)
-      return appointments
-    }
-  }
-
-  static async getAppointmentsByContact(contactId: string): Promise<Appointment[]> {
-    if (await this.isDemoMode()) {
-      const appointments = this.getDemoData("appointments")
-      return appointments.filter((apt: Appointment) => apt.contact_id === contactId)
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("contact_id", contactId)
-      .order("appointment_date", { ascending: true })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async getAppointmentsByOrganization(organizationId: string | number): Promise<Appointment[]> {
-    console.log("[v0] Loading appointments for organization:", organizationId)
-
-    if (await this.isDemoMode()) {
-      console.log("[v0] Demo mode for appointments loading: true")
-      const appointments = this.getDemoData("appointments")
-      console.log("[v0] Raw appointments data:", appointments)
-      
-      // Conversion pour comparaison en mode démo
-      const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
-      const filtered = appointments.filter((appointment: Appointment) => 
-        appointment.organization_id === searchId || appointment.organization_id === organizationId
-      )
-      console.log("[v0] Filtered appointments:", filtered.length)
-      return filtered
-    }
-
-    console.log("[v0] Demo mode for appointments loading: false")
-    const supabase = this.getClient()
-
-    try {
-      const supabaseId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
-      const { data, error } = await supabase
-        .from("appointments")
-        .select("*")
-        .eq("organization_id", supabaseId)
-        .order("appointment_date", { ascending: false })
-
-      if (error) throw error
-      console.log("[v0] Supabase appointments loaded:", data?.length || 0)
-
-      if (!data || data.length === 0) {
-        console.log("[v0] Supabase returned empty data, checking localStorage fallback")
-        const appointments = this.getDemoData("appointments")
-        console.log("[v0] Fallback appointments data:", appointments)
-        const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
-        const filtered = appointments.filter(
-          (appointment: Appointment) => appointment.organization_id === searchId || appointment.organization_id === organizationId
-        )
-        console.log("[v0] Fallback appointments loaded:", filtered.length)
-        return filtered
-      }
-
-      return data || []
-    } catch (error) {
-      console.log("[v0] Supabase appointments failed, falling back to demo mode:", error)
-      const appointments = this.getDemoData("appointments")
-      console.log("[v0] Fallback appointments data:", appointments)
-      const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
-      const filtered = appointments.filter((appointment: Appointment) => 
-        appointment.organization_id === searchId || appointment.organization_id === organizationId
-      )
-      console.log("[v0] Fallback appointments loaded:", filtered.length)
-      return filtered
-    }
-  }
-
-  static async deleteAppointment(id: string): Promise<void> {
-    console.log("[v0] deleteAppointment called with id:", id)
-
-    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
-
-    if ((await this.isDemoMode()) || !isValidUUID) {
-      console.log("[v0] Using demo mode for appointment deletion")
-      const appointments = this.getDemoData("appointments")
-      const updatedAppointments = appointments.filter((apt: any) => apt.id !== id)
-      this.setDemoData("appointments", updatedAppointments)
-      console.log("[v0] Appointment deleted from localStorage")
-      return
-    }
-
-    try {
-      console.log("[v0] Using Supabase for appointment deletion")
-      const supabase = this.getClient()
-      const { error } = await supabase.from("appointments").delete().eq("id", id)
-
-      if (error) throw error
-      console.log("[v0] Appointment deleted from Supabase")
-    } catch (error) {
-      console.error("[v0] Supabase deletion failed, falling back to demo mode:", error)
-      const appointments = this.getDemoData("appointments")
-      const updatedAppointments = appointments.filter((apt: any) => apt.id !== id)
-      this.setDemoData("appointments", updatedAppointments)
-      console.log("[v0] Fallback appointment deleted from localStorage")
-    }
-  }
-
-  static async createAppointment(
-    appointment: Omit<Appointment, "id" | "created_at" | "updated_at">,
-  ): Promise<Appointment> {
-    console.log("[v0] createAppointment called with:", appointment)
-
-    if (await this.isDemoMode()) {
-      console.log("[v0] Using demo mode for appointment creation")
-      const newAppointment: Appointment = {
-        ...appointment,
-        id: this.generateId(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      const appointments = this.getDemoData("appointments")
-      appointments.unshift(newAppointment)
-      this.setDemoData("appointments", appointments)
-      console.log("[v0] Demo appointment created:", newAppointment.id)
-      return newAppointment
-    }
-
-    try {
-      console.log("[v0] Using Supabase for appointment creation")
-      const supabase = this.getClient()
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        console.log("[v0] No authenticated user, falling back to demo mode")
-        throw new Error("User not authenticated")
-      }
-
-      const { data, error } = await supabase
-        .from("appointments")
-        .insert({
-          ...appointment,
-          created_by: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      console.log("[v0] Supabase appointment created:", data.id)
-      return data
-    } catch (error) {
-      console.log("[v0] Supabase creation failed, falling back to demo mode:", error.message)
-      const newAppointment: Appointment = {
-        ...appointment,
-        id: this.generateId(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      const appointments = this.getDemoData("appointments")
-      appointments.unshift(newAppointment)
-      this.setDemoData("appointments", appointments)
-      console.log("[v0] Fallback appointment created:", newAppointment.id)
-      return newAppointment
-    }
-  }
-
-  static async updateAppointment(id: string, updates: Partial<Appointment>): Promise<Appointment> {
-    console.log("[v0] updateAppointment called with id:", id, "updates:", updates)
-
-    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
-
-    if ((await this.isDemoMode()) || !isValidUUID) {
-      console.log("[v0] Using demo mode for appointment update")
-      const appointments = this.getDemoData("appointments")
-      const index = appointments.findIndex((apt: any) => apt.id === id)
-      if (index !== -1) {
-        appointments[index] = {
-          ...appointments[index],
-          ...updates,
-          updated_at: new Date().toISOString(),
-        }
-        this.setDemoData("appointments", appointments)
-        console.log("[v0] Demo appointment updated:", appointments[index].id)
-        return appointments[index]
-      }
-      throw new Error("Appointment not found")
-    }
-
-    try {
-      console.log("[v0] Using Supabase for appointment update")
-      const supabase = this.getClient()
-      const { data, error } = await supabase
-        .from("appointments")
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .select()
-        .single()
-
-      if (error) throw error
-      console.log("[v0] Supabase appointment updated:", data.id)
-      return data
-    } catch (error) {
-      console.error("[v0] Supabase update failed, falling back to demo mode:", error)
-      const appointments = this.getDemoData("appointments")
-      const index = appointments.findIndex((apt: any) => apt.id === id)
-      if (index !== -1) {
-        appointments[index] = {
-          ...appointments[index],
-          ...updates,
-          updated_at: new Date().toISOString(),
-        }
-        this.setDemoData("appointments", appointments)
-        console.log("[v0] Fallback appointment updated:", appointments[index].id)
-        return appointments[index]
-      }
-      throw new Error("Appointment not found")
-    }
-  }
-
-  // Contracts
+  // ============ CONTRACTS - VERSION COMPLÈTEMENT RECODÉE ============
   static async getContracts(): Promise<Contract[]> {
+    console.log("[CRM] Loading contracts...")
+
     if (await this.isDemoMode()) {
+      console.log("[CRM] Using demo mode for contracts")
+      const demoContracts = this.getDemoData("contracts")
+      console.log("[CRM] Demo contracts loaded:", demoContracts.length)
+      return demoContracts
+    }
+
+    try {
+      console.log("[CRM] Using Supabase for contracts")
+      const supabase = this.getClient()
+      const { data, error } = await supabase
+        .from("contracts")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.log("[CRM] Supabase contracts error, falling back to demo mode:", error.message)
+        return this.getDemoData("contracts")
+      }
+
+      console.log("[CRM] Supabase contracts loaded:", data?.length || 0)
+
+      // ✅ MAPPING COHÉRENT : Supabase (underscore) → TypeScript (camelCase)
+      return (data || []).map((contract) => ({
+        id: contract.id,
+        title: contract.title || "",
+        description: contract.description || "",
+        organizationId: contract.organization_id,        // underscore → camelCase
+        contactId: contract.contact_id,                  // underscore → camelCase
+        value: contract.value || 0,
+        currency: contract.currency || "EUR",
+        status: contract.status || "envoye",
+        assignedTo: contract.assigned_to || "",          // underscore → camelCase
+        expirationDate: contract.expiration_date ? new Date(contract.expiration_date) : undefined,
+        signedDate: contract.signed_date ? new Date(contract.signed_date) : undefined,      // underscore → camelCase
+        sentDate: contract.sent_date ? new Date(contract.sent_date) : undefined,            // underscore → camelCase
+        notes: contract.notes || "",
+        documents: typeof contract.documents === "string" 
+          ? JSON.parse(contract.documents) 
+          : (contract.documents || []),
+        createdDate: contract.created_at ? new Date(contract.created_at) : new Date(),
+        updatedDate: contract.updated_at ? new Date(contract.updated_at) : new Date(),
+      }))
+    } catch (error) {
+      console.error("[CRM] Contracts loading failed:", error)
       return this.getDemoData("contracts")
     }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("contracts").select("*").order("created_date", { ascending: false })
-
-    if (error) throw error
-
-    return (data || []).map((contract) => ({
-      ...contract,
-      documents: typeof contract.documents === "string" ? JSON.parse(contract.documents) : contract.documents || [],
-    }))
   }
 
-  static async createContract(contract: Omit<Contract, "id" | "createdDate" | "updatedDate">): Promise<Contract> {
+  // ✅ VERSION COMPLÈTEMENT RECODÉE ET COHÉRENTE
+  static async createContract(contractInput: Omit<Contract, "id" | "createdDate" | "updatedDate">): Promise<Contract> {
+    console.log("[CRM] Creating contract:", contractInput)
+
     if (await this.isDemoMode()) {
+      console.log("[CRM] Using demo mode for contract creation")
       const newContract: Contract = {
-        ...contract,
+        ...contractInput,
         id: this.generateId(),
-        createdDate: new Date().toISOString(),
-        updatedDate: new Date().toISOString(),
+        createdDate: new Date(),
+        updatedDate: new Date(),
       }
+      
       const contracts = this.getDemoData("contracts")
       contracts.unshift(newContract)
       this.setDemoData("contracts", contracts)
+      console.log("[CRM] Contract created in demo mode:", newContract.id)
       return newContract
     }
 
-    const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("contracts")
-      .insert({
-        title: contract.title,
-        description: contract.description,
-        organization_id: contract.organization_id || contract.organizationId,
-        contact_id: contract.contact_id || contract.contactId,
-        value: contract.value,
-        currency: contract.currency,
-        status: contract.status,
-        assigned_to: contract.assigned_to || contract.assignedTo,
-        expiration_date: contract.expiration_date || contract.expirationDate,
-        signed_date: contract.signed_date || contract.signedDate,
-        notes: contract.notes,
-        documents: contract.documents || [],
-        created_date: new Date().toISOString(),
-        updated_date: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    try {
+      console.log("[CRM] Using Supabase for contract creation")
+      const supabase = this.getClient()
+      
+      // ✅ MAPPING COHÉRENT : TypeScript (camelCase) → Supabase (underscore)
+      const supabaseData = {
+        title: contractInput.title || "",
+        description: contractInput.description || "",
+        organization_id: contractInput.organizationId,                    // camelCase → underscore
+        contact_id: contractInput.contactId || null,                      // camelCase → underscore
+        value: contractInput.value || 0,
+        currency: contractInput.currency || "EUR",
+        status: contractInput.status || "envoye",
+        assigned_to: contractInput.assignedTo || "",                      // camelCase → underscore
+        expiration_date: contractInput.expirationDate || null,
+        signed_date: contractInput.signedDate || null,                    // camelCase → underscore
+        sent_date: contractInput.sentDate || null,                        // camelCase → underscore
+        notes: contractInput.notes || "",
+        documents: JSON.stringify(contractInput.documents || []),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
 
-    if (error) throw error
+      console.log("[CRM] Inserting contract data:", supabaseData)
 
-    return {
-      ...data,
-      documents: Array.isArray(data.documents)
-        ? data.documents
-        : typeof data.documents === "string"
-          ? JSON.parse(data.documents)
-          : [],
+      const { data, error } = await supabase
+        .from("contracts")
+        .insert(supabaseData)
+        .select()
+        .single()
+
+      if (error) {
+        console.error("[CRM] Contract creation error:", error)
+        throw new Error(`Erreur création contrat: ${error.message}`)
+      }
+
+      console.log("[CRM] Contract created in Supabase:", data.id)
+      
+      // ✅ MAPPING DE RETOUR : Supabase (underscore) → TypeScript (camelCase)
+      return {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        organizationId: data.organization_id,              // underscore → camelCase
+        contactId: data.contact_id,                        // underscore → camelCase
+        value: data.value,
+        currency: data.currency,
+        status: data.status,
+        assignedTo: data.assigned_to,                      // underscore → camelCase
+        expirationDate: data.expiration_date ? new Date(data.expiration_date) : undefined,
+        signedDate: data.signed_date ? new Date(data.signed_date) : undefined,    // underscore → camelCase
+        sentDate: data.sent_date ? new Date(data.sent_date) : undefined,          // underscore → camelCase
+        notes: data.notes,
+        documents: typeof data.documents === "string" 
+          ? JSON.parse(data.documents) 
+          : (data.documents || []),
+        createdDate: new Date(data.created_at),
+        updatedDate: new Date(data.updated_at),
+      }
+    } catch (error) {
+      console.error("[CRM] Contract creation failed:", error)
+      throw error
     }
   }
 
   static async updateContract(id: string, updates: Partial<Contract>): Promise<Contract> {
+    console.log("[CRM] Updating contract:", id, updates)
+
     if (await this.isDemoMode()) {
+      console.log("[CRM] Using demo mode for contract update")
       const contracts = this.getDemoData("contracts")
       const index = contracts.findIndex((contract: Contract) => contract.id === id)
+      
       if (index !== -1) {
         contracts[index] = {
           ...contracts[index],
           ...updates,
-          updatedDate: new Date().toISOString(),
+          updatedDate: new Date(),
         }
         this.setDemoData("contracts", contracts)
+        console.log("[CRM] Contract updated in demo mode")
         return contracts[index]
       }
-      throw new Error("Contract not found")
+      throw new Error("Contract not found in demo data")
     }
 
-    const supabase = this.getClient()
+    try {
+      console.log("[CRM] Using Supabase for contract update")
+      const supabase = this.getClient()
 
-    const updateData = { ...updates, updated_date: new Date().toISOString() }
-    if (updateData.documents) {
-      updateData.documents = JSON.stringify(updateData.documents)
-    }
+      // ✅ MAPPING COHÉRENT pour les updates : TypeScript (camelCase) → Supabase (underscore)
+      const supabaseUpdates: any = { 
+        updated_at: new Date().toISOString() 
+      }
+      
+      if (updates.title !== undefined) supabaseUpdates.title = updates.title
+      if (updates.description !== undefined) supabaseUpdates.description = updates.description
+      if (updates.organizationId !== undefined) supabaseUpdates.organization_id = updates.organizationId
+      if (updates.contactId !== undefined) supabaseUpdates.contact_id = updates.contactId
+      if (updates.value !== undefined) supabaseUpdates.value = updates.value
+      if (updates.currency !== undefined) supabaseUpdates.currency = updates.currency
+      if (updates.status !== undefined) supabaseUpdates.status = updates.status
+      if (updates.assignedTo !== undefined) supabaseUpdates.assigned_to = updates.assignedTo
+      if (updates.expirationDate !== undefined) supabaseUpdates.expiration_date = updates.expirationDate
+      if (updates.signedDate !== undefined) supabaseUpdates.signed_date = updates.signedDate
+      if (updates.sentDate !== undefined) supabaseUpdates.sent_date = updates.sentDate
+      if (updates.notes !== undefined) supabaseUpdates.notes = updates.notes
+      if (updates.documents !== undefined) supabaseUpdates.documents = JSON.stringify(updates.documents)
 
-    const { data, error } = await supabase.from("contracts").update(updateData).eq("id", id).select().single()
+      console.log("[CRM] Supabase update data:", supabaseUpdates)
 
-    if (error) throw error
+      const { data, error } = await supabase
+        .from("contracts")
+        .update(supabaseUpdates)
+        .eq("id", id)
+        .select()
+        .single()
 
-    return {
-      ...data,
-      documents: typeof data.documents === "string" ? JSON.parse(data.documents) : data.documents || [],
+      if (error) {
+        console.error("[CRM] Contract update error:", error)
+        throw new Error(`Erreur mise à jour contrat: ${error.message}`)
+      }
+
+      console.log("[CRM] Contract updated in Supabase:", data.id)
+
+      // ✅ MAPPING DE RETOUR cohérent
+      return {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        organizationId: data.organization_id,
+        contactId: data.contact_id,
+        value: data.value,
+        currency: data.currency,
+        status: data.status,
+        assignedTo: data.assigned_to,
+        expirationDate: data.expiration_date ? new Date(data.expiration_date) : undefined,
+        signedDate: data.signed_date ? new Date(data.signed_date) : undefined,
+        sentDate: data.sent_date ? new Date(data.sent_date) : undefined,
+        notes: data.notes,
+        documents: typeof data.documents === "string" 
+          ? JSON.parse(data.documents) 
+          : (data.documents || []),
+        createdDate: new Date(data.created_at),
+        updatedDate: new Date(data.updated_at),
+      }
+    } catch (error) {
+      console.error("[CRM] Contract update failed:", error)
+      throw error
     }
   }
 
   static async deleteContract(id: string): Promise<void> {
+    console.log("[CRM] Deleting contract:", id)
+
     if (await this.isDemoMode()) {
       const contracts = this.getDemoData("contracts")
       const filtered = contracts.filter((contract: Contract) => contract.id !== id)
@@ -873,189 +462,218 @@ export class SupabaseClientDB {
 
     const supabase = this.getClient()
     const { error } = await supabase.from("contracts").delete().eq("id", id)
-
     if (error) throw error
   }
 
   static async getContractsByOrganization(organizationId: string | number): Promise<Contract[]> {
-    console.log("[v0] Loading contracts for organization:", organizationId)
+    console.log("[CRM] Loading contracts for organization:", organizationId)
 
     if (await this.isDemoMode()) {
-      console.log("[v0] Demo mode for contracts loading: true")
       const contracts = this.getDemoData("contracts")
       const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
       const filtered = contracts.filter((contract: Contract) => 
-        contract.organizationId === searchId || contract.organizationId === organizationId ||
-        contract.organization_id === searchId || contract.organization_id === organizationId
+        contract.organizationId === searchId || 
+        contract.organizationId === organizationId
       )
-      console.log("[v0] Demo contracts loaded:", filtered.length)
+      console.log("[CRM] Demo contracts for org loaded:", filtered.length)
       return filtered
     }
 
-    console.log("[v0] Demo mode for contracts loading: false")
-    const supabase = this.getClient()
-
     try {
+      const supabase = this.getClient()
       const supabaseId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
+      
       const { data, error } = await supabase
         .from("contracts")
         .select("*")
         .eq("organization_id", supabaseId)
-        .order("created_date", { ascending: false })
+        .order("created_at", { ascending: false })
 
       if (error) throw error
-      console.log("[v0] Supabase contracts loaded:", data?.length || 0)
+      
+      console.log("[CRM] Supabase contracts for org loaded:", data?.length || 0)
+      
+      // ✅ MAPPING cohérent
+      return (data || []).map((contract) => ({
+        id: contract.id,
+        title: contract.title || "",
+        description: contract.description || "",
+        organizationId: contract.organization_id,
+        contactId: contract.contact_id,
+        value: contract.value || 0,
+        currency: contract.currency || "EUR",
+        status: contract.status || "envoye",
+        assignedTo: contract.assigned_to || "",
+        expirationDate: contract.expiration_date ? new Date(contract.expiration_date) : undefined,
+        signedDate: contract.signed_date ? new Date(contract.signed_date) : undefined,
+        sentDate: contract.sent_date ? new Date(contract.sent_date) : undefined,
+        notes: contract.notes || "",
+        documents: typeof contract.documents === "string" 
+          ? JSON.parse(contract.documents) 
+          : (contract.documents || []),
+        createdDate: new Date(contract.created_at),
+        updatedDate: new Date(contract.updated_at),
+      }))
+    } catch (error) {
+      console.error("[CRM] Contracts for organization failed:", error)
+      return []
+    }
+  }
+
+  // ============ APPOINTMENTS - DÉJÀ FONCTIONNELS ============
+  static async getAppointments(): Promise<any[]> {
+    console.log("[CRM] Loading appointments...")
+
+    if (await this.isDemoMode()) {
+      const appointments = this.getDemoData("appointments")
+      console.log("[CRM] Demo appointments loaded:", appointments.length)
+      return appointments
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+      console.log("[CRM] Supabase appointments loaded:", data?.length || 0)
       return data || []
     } catch (error) {
-      console.log("[v0] Supabase contracts failed, falling back to demo mode:", error)
-      const contracts = this.getDemoData("contracts")
+      console.error("[CRM] Appointments loading failed:", error)
+      return this.getDemoData("appointments")
+    }
+  }
+
+  static async getAppointmentsByOrganization(organizationId: string | number): Promise<Appointment[]> {
+    console.log("[CRM] Loading appointments for organization:", organizationId)
+
+    if (await this.isDemoMode()) {
+      const appointments = this.getDemoData("appointments")
       const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
-      const filtered = contracts.filter((contract: Contract) => 
-        contract.organizationId === searchId || contract.organizationId === organizationId ||
-        contract.organization_id === searchId || contract.organization_id === organizationId
+      const filtered = appointments.filter((appointment: Appointment) => 
+        appointment.organization_id === searchId || appointment.organization_id === organizationId
       )
-      console.log("[v0] Fallback contracts loaded:", filtered.length)
+      console.log("[CRM] Demo appointments for org loaded:", filtered.length)
       return filtered
     }
-  }
 
-  static async getContractsByAssignee(assignedTo: string): Promise<Contract[]> {
-    if (await this.isDemoMode()) {
-      const contracts = this.getDemoData("contracts")
-      return contracts.filter((contract: Contract) => contract.assignedTo === assignedTo)
+    try {
+      const supabase = this.getClient()
+      const supabaseId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
+      
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("*")
+        .eq("organization_id", supabaseId)
+        .order("appointment_date", { ascending: false })
+
+      if (error) throw error
+      console.log("[CRM] Supabase appointments for org loaded:", data?.length || 0)
+      return data || []
+    } catch (error) {
+      console.error("[CRM] Appointments for organization failed:", error)
+      return this.getDemoData("appointments")
     }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("contracts")
-      .select("*")
-      .eq("assigned_to", assignedTo)
-      .order("created_date", { ascending: false })
-
-    if (error) throw error
-    return data || []
   }
 
-  // User Management
-  static async getAdmins(): Promise<any[]> {
+  static async createAppointment(appointment: Omit<Appointment, "id" | "created_at" | "updated_at">): Promise<Appointment> {
+    console.log("[CRM] Creating appointment:", appointment)
+
     if (await this.isDemoMode()) {
-      return this.getDemoData("admins")
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("admins").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async createAdmin(admin: { email: string; full_name: string }): Promise<any> {
-    if (await this.isDemoMode()) {
-      const newAdmin = {
-        ...admin,
-        id: this.generateId(),
-        user_id: this.generateId(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      const admins = this.getDemoData("admins")
-      admins.unshift(newAdmin)
-      this.setDemoData("admins", admins)
-      return newAdmin
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("admins")
-      .insert({
-        ...admin,
-        user_id: this.generateId(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async getCommerciaux(): Promise<any[]> {
-    if (await this.isDemoMode()) {
-      return this.getDemoData("commerciaux")
-    }
-
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("commerciaux").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async createCommercial(commercial: {
-    email: string
-    full_name: string
-    phone?: string
-    region?: string
-    notes?: string
-  }): Promise<any> {
-    if (await this.isDemoMode()) {
-      const newCommercial = {
-        ...commercial,
+      const newAppointment: Appointment = {
+        ...appointment,
         id: this.generateId(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
-      const commerciaux = this.getDemoData("commerciaux")
-      commerciaux.unshift(newCommercial)
-      this.setDemoData("commerciaux", commerciaux)
-      return newCommercial
+      
+      const appointments = this.getDemoData("appointments")
+      appointments.unshift(newAppointment)
+      this.setDemoData("appointments", appointments)
+      console.log("[CRM] Appointment created in demo mode:", newAppointment.id)
+      return newAppointment
     }
 
-    const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("commerciaux")
-      .insert({
-        ...commercial,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    try {
+      const supabase = this.getClient()
+      const { data: { user } } = await supabase.auth.getUser()
 
-    if (error) throw error
-    return data
+      const { data, error } = await supabase
+        .from("appointments")
+        .insert({
+          ...appointment,
+          created_by: user?.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      console.log("[CRM] Appointment created in Supabase:", data.id)
+      return data
+    } catch (error) {
+      console.error("[CRM] Appointment creation failed:", error)
+      throw error
+    }
   }
 
-  static async deleteAdmin(id: string): Promise<void> {
+  static async updateAppointment(id: string, updates: Partial<Appointment>): Promise<Appointment> {
+    console.log("[CRM] Updating appointment:", id, updates)
+
     if (await this.isDemoMode()) {
-      const admins = this.getDemoData("admins")
-      const filtered = admins.filter((admin: any) => admin.id !== id)
-      this.setDemoData("admins", filtered)
+      const appointments = this.getDemoData("appointments")
+      const index = appointments.findIndex((apt: any) => apt.id === id)
+      
+      if (index !== -1) {
+        appointments[index] = {
+          ...appointments[index],
+          ...updates,
+          updated_at: new Date().toISOString(),
+        }
+        this.setDemoData("appointments", appointments)
+        console.log("[CRM] Appointment updated in demo mode")
+        return appointments[index]
+      }
+      throw new Error("Appointment not found")
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase
+        .from("appointments")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single()
+
+      if (error) throw error
+      console.log("[CRM] Appointment updated in Supabase:", data.id)
+      return data
+    } catch (error) {
+      console.error("[CRM] Appointment update failed:", error)
+      throw error
+    }
+  }
+
+  static async deleteAppointment(id: string): Promise<void> {
+    console.log("[CRM] Deleting appointment:", id)
+
+    if (await this.isDemoMode()) {
+      const appointments = this.getDemoData("appointments")
+      const updated = appointments.filter((apt: any) => apt.id !== id)
+      this.setDemoData("appointments", updated)
       return
     }
 
     const supabase = this.getClient()
-    const { error } = await supabase.from("admins").delete().eq("id", id)
-
+    const { error } = await supabase.from("appointments").delete().eq("id", id)
     if (error) throw error
   }
 
-  static async deleteCommercial(id: string): Promise<void> {
-    if (await this.isDemoMode()) {
-      const commerciaux = this.getDemoData("commerciaux")
-      const filtered = commerciaux.filter((commercial: any) => commercial.id !== id)
-      this.setDemoData("commerciaux", filtered)
-      return
-    }
-
-    const supabase = this.getClient()
-    const { error } = await supabase.from("commerciaux").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // Demo data storage and retrieval functions
+  // ============ UTILITAIRES ============
   private static getDemoData(key: string) {
     if (typeof window === "undefined") return []
     const data = localStorage.getItem(`demo_${key}`)
@@ -1085,154 +703,52 @@ export class SupabaseClientDB {
             name: "Hôtel Le Grand Palace",
             industry: "Hôtellerie",
             activityType: "Hôtel",
+            category: "5 étoiles",
+            region: "Nord",
+            district: "Port Louis",
+            city: "Port Louis",
+            address: "123 Royal Street",
+            phone: "+230 123 4567",
+            email: "contact@legrandpalace.mu",
+            website: "https://legrandpalace.mu",
+            nb_chambres: 120,
+            secteur: "Tourisme",
+            zone_geographique: "Nord",
+            contact_principal: "Jean Dupont",
+            contact_fonction: "Manager",
+            notes: "Hôtel de luxe au centre-ville",
+            status: "Active",
+            priority: "High",
             size: "Grande entreprise",
-            website: "https://legrandpalace.com",
-            email: "contact@legrandpalace.com",
-            phone: "+33 1 23 45 67 89",
-            address: "123 Avenue des Champs-Élysées",
-            city: "Paris",
-            region: "Île-de-France",
-            country: "France",
-            status: "Actif",
-            priority: "Haute",
-            notes: "Client premium avec 200 chambres",
-            created_at: "2024-01-15T10:00:00Z",
-            updated_at: "2024-01-15T10:00:00Z",
+            country: "Maurice",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           },
           {
             id: 2,
-            name: "Pharmacie Central",
-            industry: "Santé",
-            activityType: "Pharmacie",
-            size: "PME",
-            website: "https://pharmaciecentral.fr",
-            email: "info@pharmaciecentral.fr",
-            phone: "+33 1 98 76 54 32",
-            address: "45 Rue de la République",
-            city: "Lyon",
-            region: "Auvergne-Rhône-Alpes",
-            country: "France",
+            name: "Resort Tropical Paradise",
+            industry: "Hôtellerie",
+            activityType: "Resort",
+            category: "4 étoiles",
+            region: "Nord",
+            district: "Rivière du Rempart",
+            city: "Grand Baie",
+            address: "456 Coastal Road",
+            phone: "+230 987 6543",
+            email: "info@tropicalparadise.mu",
+            website: "https://tropicalparadise.mu",
+            nb_chambres: 200,
+            secteur: "Tourisme",
+            zone_geographique: "Nord",
+            contact_principal: "Marie Lagesse",
+            contact_fonction: "Directrice",
+            notes: "Resort de luxe en bord de mer",
             status: "Prospect",
-            priority: "Moyenne",
-            notes: "Pharmacie familiale depuis 1950",
-            created_at: "2024-01-20T14:30:00Z",
-            updated_at: "2024-01-20T14:30:00Z",
-          },
-        ]
-
-      case "contacts":
-        return [
-          {
-            id: "1",
-            organization_id: 1,
-            fullName: "Marie Dubois",
-            role: "Directrice Générale",
-            email: "marie.dubois@legrandpalace.com",
-            phone: "01 42 56 78 90",
-            mobilePhone: "06 12 34 56 78",
-            linkedinProfile: "https://linkedin.com/in/marie-dubois",
-            consentMarketing: true,
-            notes: "Très intéressée par nos solutions. Préfère les rendez-vous en matinée.",
-            lastContactDate: "2024-03-01T10:00:00Z",
-            nextFollowUpDate: "2024-03-15T10:00:00Z",
-            appointmentHistory: [],
-            prospectStatus: "hot",
-            priority: "high",
-            source: "Référence",
-            created_at: "2024-02-15T10:00:00Z",
-            updated_at: "2024-03-01T10:00:00Z",
-          },
-          {
-            id: "2",
-            organization_id: 2,
-            fullName: "Pierre Martin",
-            role: "Pharmacien Titulaire",
-            email: "pierre.martin@pharmaciecentral.fr",
-            phone: "04 78 90 12 34",
-            mobilePhone: "06 98 76 54 32",
-            consentMarketing: true,
-            notes: "Demande plus d'informations sur les tarifs.",
-            lastContactDate: "2024-02-28T10:00:00Z",
-            nextFollowUpDate: "2024-03-10T10:00:00Z",
-            appointmentHistory: [],
-            prospectStatus: "cold",
-            priority: "medium",
-            source: "Site web",
-            created_at: "2024-02-20T10:00:00Z",
-            updated_at: "2024-02-28T10:00:00Z",
-          },
-        ]
-
-      case "appointments":
-        return [
-          {
-            id: "z9fr8aj0e",
-            organization_id: "1",
-            contact_id: "1",
-            title: "Présentation solution CRM",
-            description: "Démonstration des fonctionnalités principales",
-            appointment_date: "2024-03-15",
-            appointment_time: "10:00",
-            duration: 60,
-            location: "Hôtel Le Grand Palace",
-            city: "Paris",
-            region: "Île-de-France",
-            address: "123 Avenue des Champs-Élysées",
-            type: "Meeting",
-            status: "Scheduled",
-            reminder: true,
-            created_at: "2024-03-01T10:00:00Z",
-            updated_at: "2024-03-01T10:00:00Z",
-          },
-          {
-            id: "7d3o9kq7c",
-            organization_id: "2",
-            contact_id: "2",
-            title: "Appel de suivi",
-            description: "Discussion sur les besoins spécifiques",
-            appointment_date: "2024-03-12",
-            appointment_time: "14:30",
-            duration: 30,
-            location: "Téléphone",
-            city: "Lyon",
-            region: "Auvergne-Rhône-Alpes",
-            type: "Call",
-            status: "Scheduled",
-            reminder: true,
-            created_at: "2024-03-05T10:00:00Z",
-            updated_at: "2024-03-05T10:00:00Z",
-          },
-        ]
-
-      case "deals":
-        return [
-          {
-            id: "deal_001",
-            organization_id: 1,
-            contact_id: "1",
-            title: "CRM Solution - Hôtel Le Grand Palace",
-            description: "Implémentation complète du système CRM",
-            value: 25000,
-            currency: "EUR",
-            stage: "proposal",
-            probability: 75,
-            expected_close_date: "2024-04-15",
-            created_at: "2024-03-01T10:00:00Z",
-            updated_at: "2024-03-01T10:00:00Z",
-          },
-          {
-            id: "deal_002",
-            organization_id: 2,
-            contact_id: "2",
-            title: "CRM Solution - Pharmacie Central",
-            description: "Solution CRM adaptée aux pharmacies",
-            value: 12000,
-            currency: "EUR",
-            stage: "qualification",
-            probability: 50,
-            expected_close_date: "2024-05-01",
-            created_at: "2024-02-28T10:00:00Z",
-            updated_at: "2024-02-28T10:00:00Z",
+            priority: "Medium",
+            size: "Grande entreprise",
+            country: "Maurice",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           },
         ]
 
@@ -1240,73 +756,59 @@ export class SupabaseClientDB {
         return [
           {
             id: "contract_001",
-            organizationId: 1,
-            contactId: "1",
             title: "Contrat CRM Hôtel Le Grand Palace",
             description: "Solution CRM complète pour la gestion des clients et réservations",
+            organizationId: "1",
+            contactId: null,
             value: 15000,
             currency: "EUR",
-            status: "sent",
-            signedDate: undefined,
-            expirationDate: new Date("2024-06-15"),
+            status: "envoye",
             assignedTo: "Jean Dupont",
+            expirationDate: new Date("2024-06-15"),
+            signedDate: undefined,
+            sentDate: new Date("2024-03-01"),
+            notes: "Contrat envoyé suite à la démonstration. En attente de signature.",
+            documents: [],
             createdDate: new Date("2024-03-01"),
             updatedDate: new Date("2024-03-01"),
-            documents: [],
-            notes: "Contrat envoyé suite à la démonstration. En attente de signature.",
           },
           {
             id: "contract_002",
-            organizationId: 2,
-            contactId: "2",
-            title: "Contrat CRM Pharmacie Central",
-            description: "Solution CRM adaptée aux pharmacies avec gestion des stocks",
-            value: 8500,
+            title: "Contrat CRM Resort Tropical",
+            description: "Solution CRM adaptée aux resorts avec gestion des réservations",
+            organizationId: "2",
+            contactId: null,
+            value: 18500,
             currency: "EUR",
-            status: "draft",
-            signedDate: undefined,
-            expirationDate: new Date("2024-05-30"),
+            status: "signe",
             assignedTo: "Sophie Martin",
-            createdDate: new Date("2024-02-28"),
-            updatedDate: new Date("2024-03-05"),
+            expirationDate: new Date("2024-12-31"),
+            signedDate: new Date("2024-03-15"),
+            sentDate: new Date("2024-02-28"),
+            notes: "Contrat signé et en cours d'implémentation.",
             documents: [],
-            notes: "Contrat en préparation. Attente des spécifications techniques.",
+            createdDate: new Date("2024-02-28"),
+            updatedDate: new Date("2024-03-15"),
           },
         ]
 
-      case "admins":
+      case "appointments":
         return [
           {
-            id: "admin1",
-            user_id: "user1",
-            email: "admin@crm.com",
-            full_name: "Administrateur Principal",
-            created_at: "2024-01-01T00:00:00Z",
-            updated_at: "2024-01-01T00:00:00Z",
-          },
-        ]
-
-      case "commerciaux":
-        return [
-          {
-            id: "comm1",
-            email: "marie.dupont@crm.com",
-            full_name: "Marie Dupont",
-            phone: "+33 6 12 34 56 78",
-            region: "Île-de-France",
-            notes: "Spécialisée dans l'hôtellerie de luxe",
-            created_at: "2024-01-05T00:00:00Z",
-            updated_at: "2024-01-05T00:00:00Z",
-          },
-          {
-            id: "comm2",
-            email: "jean.martin@crm.com",
-            full_name: "Jean Martin",
-            phone: "+33 6 98 76 54 32",
-            region: "Auvergne-Rhône-Alpes",
-            notes: "Expert en pharmacies et établissements de santé",
-            created_at: "2024-01-05T00:00:00Z",
-            updated_at: "2024-01-05T00:00:00Z",
+            id: "apt_001",
+            organization_id: "1",
+            contact_id: null,
+            title: "Présentation solution CRM",
+            description: "Démonstration des fonctionnalités principales",
+            appointment_date: "2024-03-25",
+            appointment_time: "10:00",
+            duration: 60,
+            location: "Hôtel Le Grand Palace",
+            type: "Meeting",
+            status: "Scheduled",
+            reminder: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           },
         ]
 
@@ -1320,26 +822,5 @@ export class SupabaseClientDB {
   }
 }
 
-// Fonction d'initialisation des données de démonstration
-function initializeDemoData() {
-  if (typeof window === "undefined") return
-
-  const dataTypes = ["organizations", "admins", "commerciaux", "contacts", "deals", "appointments", "contracts"]
-  
-  dataTypes.forEach(type => {
-    if (!localStorage.getItem(`demo_${type}`)) {
-      const demoData = SupabaseClientDB['getInitialDemoData'](type)
-      if (demoData.length > 0) {
-        localStorage.setItem(`demo_${type}`, JSON.stringify(demoData))
-      }
-    }
-  })
-}
-
-// Initialiser les données de démo au chargement de la page
-if (typeof window !== "undefined") {
-  window.addEventListener("load", initializeDemoData)
-}
-
-// Export pour compatibilité avec l'ancien code
+// Export pour compatibilité
 export { SupabaseClientDB as SupabaseDB }
