@@ -11,7 +11,16 @@ export interface Profile {
   updated_at: string
 }
 
-// Client-side database operations - VERSION RECODÉE ET COHÉRENTE
+/**
+ * ============================================================================
+ * SUPABASE CLIENT DB - VERSION COMPLÈTEMENT RECODÉE
+ * ============================================================================
+ * 
+ * Basée sur la structure exacte de votre table contracts:
+ * - organization_id, contact_id, assigned_to, signed_date, send_date (snake_case)
+ * - Mapping automatique snake_case ↔ camelCase
+ * - Support mode démo + mode Supabase
+ */
 export class SupabaseClientDB {
   private static getClient() {
     return createClient()
@@ -47,7 +56,9 @@ export class SupabaseClientDB {
     }
   }
 
-  // ============ ORGANIZATIONS - VERSION RECODÉE ============
+  // ============================================================================
+  // ORGANIZATIONS - GARDE VOTRE CODE EXISTANT QUI FONCTIONNE
+  // ============================================================================
   static async getOrganizations(): Promise<Organization[]> {
     console.log("[CRM] Loading organizations...")
 
@@ -164,7 +175,6 @@ export class SupabaseClientDB {
     }
   }
 
-  // ✅ VERSION SIMPLIFIÉE ET ROBUSTE
   static async updateOrganization(id: number | string, updates: Partial<Organization>): Promise<Organization> {
     console.log("[CRM] Updating organization - ID:", id, "Type:", typeof id)
     
@@ -225,62 +235,96 @@ export class SupabaseClientDB {
     if (error) throw error
   }
 
-  // ============ CONTRACTS - VERSION COMPLÈTEMENT RECODÉE ============
+  // ============================================================================
+  // CONTRACTS - SECTION COMPLÈTEMENT RECODÉE BASÉE SUR VOTRE VRAIE STRUCTURE
+  // ============================================================================
+
+  /**
+   * Récupère tous les contrats avec mapping correct snake_case → camelCase
+   */
   static async getContracts(): Promise<Contract[]> {
-    console.log("[CRM] Loading contracts...")
+    console.log("[CRM] 📋 Loading contracts...")
 
     if (await this.isDemoMode()) {
       console.log("[CRM] Using demo mode for contracts")
       const demoContracts = this.getDemoData("contracts")
-      console.log("[CRM] Demo contracts loaded:", demoContracts.length)
+      console.log("[CRM] ✅ Demo contracts loaded:", demoContracts.length)
       return demoContracts
     }
 
     try {
       console.log("[CRM] Using Supabase for contracts")
       const supabase = this.getClient()
+      
       const { data, error } = await supabase
         .from("contracts")
-        .select("*")
+        .select(`
+          id,
+          title,
+          description,
+          organization_id,
+          contact_id,
+          value,
+          currency,
+          status,
+          signed_date,
+          expiration_date,
+          assigned_to,
+          notes,
+          created_at,
+          updated_at,
+          send_date,
+          documents
+        `)
         .order("created_at", { ascending: false })
 
       if (error) {
-        console.log("[CRM] Supabase contracts error, falling back to demo mode:", error.message)
+        console.error("[CRM] ❌ Supabase contracts error:", error.message)
+        console.log("[CRM] Falling back to demo mode")
         return this.getDemoData("contracts")
       }
 
-      console.log("[CRM] Supabase contracts loaded:", data?.length || 0)
+      console.log("[CRM] ✅ Raw Supabase contracts loaded:", data?.length || 0)
+      
+      // 🔄 MAPPING EXACT : Supabase (snake_case) → TypeScript (camelCase)
+      const mappedContracts = (data || []).map((contract) => {
+        const mapped = {
+          id: contract.id,
+          title: contract.title || "",
+          description: contract.description || "",
+          organizationId: contract.organization_id,                    // ✅ organization_id → organizationId
+          contactId: contract.contact_id || null,                      // ✅ contact_id → contactId
+          value: contract.value || 0,
+          currency: contract.currency || "EUR",
+          status: contract.status || "envoye",
+          assignedTo: contract.assigned_to || "",                      // ✅ assigned_to → assignedTo
+          expirationDate: contract.expiration_date ? new Date(contract.expiration_date) : undefined,
+          signedDate: contract.signed_date ? new Date(contract.signed_date) : undefined,        // ✅ signed_date → signedDate
+          sentDate: contract.send_date ? new Date(contract.send_date) : undefined,              // ✅ send_date → sentDate
+          notes: contract.notes || "",
+          documents: this.parseDocuments(contract.documents),
+          createdDate: contract.created_at ? new Date(contract.created_at) : new Date(),
+          updatedDate: contract.updated_at ? new Date(contract.updated_at) : new Date(),
+        }
+        console.log("[CRM] 🔄 Mapped contract:", contract.id, "→", { organizationId: mapped.organizationId, sentDate: mapped.sentDate })
+        return mapped
+      })
 
-      // ✅ MAPPING COHÉRENT : Supabase (underscore) → TypeScript (camelCase)
-      return (data || []).map((contract) => ({
-        id: contract.id,
-        title: contract.title || "",
-        description: contract.description || "",
-        organizationId: contract.organization_id,        // underscore → camelCase
-        contactId: contract.contact_id,                  // underscore → camelCase
-        value: contract.value || 0,
-        currency: contract.currency || "EUR",
-        status: contract.status || "envoye",
-        assignedTo: contract.assigned_to || "",          // underscore → camelCase
-        expirationDate: contract.expiration_date ? new Date(contract.expiration_date) : undefined,
-        signedDate: contract.signed_date ? new Date(contract.signed_date) : undefined,      // underscore → camelCase
-        sentDate: contract.sent_date ? new Date(contract.sent_date) : undefined,            // underscore → camelCase
-        notes: contract.notes || "",
-        documents: typeof contract.documents === "string" 
-          ? JSON.parse(contract.documents) 
-          : (contract.documents || []),
-        createdDate: contract.created_at ? new Date(contract.created_at) : new Date(),
-        updatedDate: contract.updated_at ? new Date(contract.updated_at) : new Date(),
-      }))
+      console.log("[CRM] ✅ Contracts mapped and ready:", mappedContracts.length)
+      return mappedContracts
+      
     } catch (error) {
-      console.error("[CRM] Contracts loading failed:", error)
+      console.error("[CRM] ❌ Contracts loading failed:", error)
+      console.log("[CRM] Falling back to demo mode")
       return this.getDemoData("contracts")
     }
   }
 
-  // ✅ VERSION COMPLÈTEMENT RECODÉE ET COHÉRENTE
+  /**
+   * Crée un nouveau contrat avec mapping correct camelCase → snake_case
+   */
   static async createContract(contractInput: Omit<Contract, "id" | "createdDate" | "updatedDate">): Promise<Contract> {
-    console.log("[CRM] Creating contract:", contractInput)
+    console.log("[CRM] 📝 Creating contract:", contractInput.title)
 
     if (await this.isDemoMode()) {
       console.log("[CRM] Using demo mode for contract creation")
@@ -294,7 +338,7 @@ export class SupabaseClientDB {
       const contracts = this.getDemoData("contracts")
       contracts.unshift(newContract)
       this.setDemoData("contracts", contracts)
-      console.log("[CRM] Contract created in demo mode:", newContract.id)
+      console.log("[CRM] ✅ Contract created in demo mode:", newContract.id)
       return newContract
     }
 
@@ -302,69 +346,77 @@ export class SupabaseClientDB {
       console.log("[CRM] Using Supabase for contract creation")
       const supabase = this.getClient()
       
-      // ✅ MAPPING COHÉRENT : TypeScript (camelCase) → Supabase (underscore)
+      // 🔄 MAPPING EXACT : TypeScript (camelCase) → Supabase (snake_case)
       const supabaseData = {
         title: contractInput.title || "",
         description: contractInput.description || "",
-        organization_id: contractInput.organizationId,                    // camelCase → underscore
-        contact_id: contractInput.contactId || null,                      // camelCase → underscore
+        organization_id: contractInput.organizationId,                        // ✅ organizationId → organization_id
+        contact_id: contractInput.contactId || null,                          // ✅ contactId → contact_id
         value: contractInput.value || 0,
         currency: contractInput.currency || "EUR",
         status: contractInput.status || "envoye",
-        assigned_to: contractInput.assignedTo || "",                      // camelCase → underscore
-        expiration_date: contractInput.expirationDate || null,
-        signed_date: contractInput.signedDate || null,                    // camelCase → underscore
-        sent_date: contractInput.sentDate || null,                        // camelCase → underscore
+        assigned_to: contractInput.assignedTo || null,                        // ✅ assignedTo → assigned_to
+        expiration_date: contractInput.expirationDate ? contractInput.expirationDate.toISOString() : null,
+        signed_date: contractInput.signedDate ? contractInput.signedDate.toISOString() : null,      // ✅ signedDate → signed_date
+        send_date: contractInput.sentDate ? contractInput.sentDate.toISOString() : null,            // ✅ sentDate → send_date (CLEF!)
         notes: contractInput.notes || "",
-        documents: JSON.stringify(contractInput.documents || []),
+        documents: this.stringifyDocuments(contractInput.documents),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
 
-      console.log("[CRM] Inserting contract data:", supabaseData)
+      console.log("[CRM] 📤 Inserting contract data into Supabase:", {
+        ...supabaseData,
+        documents: `[${Array.isArray(contractInput.documents) ? contractInput.documents.length : 0} files]`
+      })
 
       const { data, error } = await supabase
         .from("contracts")
-        .insert(supabaseData)
+        .insert([supabaseData])
         .select()
         .single()
 
       if (error) {
-        console.error("[CRM] Contract creation error:", error)
+        console.error("[CRM] ❌ Contract creation error:", error)
         throw new Error(`Erreur création contrat: ${error.message}`)
       }
 
-      console.log("[CRM] Contract created in Supabase:", data.id)
+      console.log("[CRM] ✅ Contract created in Supabase with ID:", data.id)
       
-      // ✅ MAPPING DE RETOUR : Supabase (underscore) → TypeScript (camelCase)
-      return {
+      // 🔄 MAPPING DE RETOUR : Supabase (snake_case) → TypeScript (camelCase)
+      const createdContract = {
         id: data.id,
         title: data.title,
         description: data.description,
-        organizationId: data.organization_id,              // underscore → camelCase
-        contactId: data.contact_id,                        // underscore → camelCase
+        organizationId: data.organization_id,                  // ✅ organization_id → organizationId
+        contactId: data.contact_id,                            // ✅ contact_id → contactId
         value: data.value,
         currency: data.currency,
         status: data.status,
-        assignedTo: data.assigned_to,                      // underscore → camelCase
+        assignedTo: data.assigned_to,                          // ✅ assigned_to → assignedTo
         expirationDate: data.expiration_date ? new Date(data.expiration_date) : undefined,
-        signedDate: data.signed_date ? new Date(data.signed_date) : undefined,    // underscore → camelCase
-        sentDate: data.sent_date ? new Date(data.sent_date) : undefined,          // underscore → camelCase
+        signedDate: data.signed_date ? new Date(data.signed_date) : undefined,        // ✅ signed_date → signedDate
+        sentDate: data.send_date ? new Date(data.send_date) : undefined,              // ✅ send_date → sentDate
         notes: data.notes,
-        documents: typeof data.documents === "string" 
-          ? JSON.parse(data.documents) 
-          : (data.documents || []),
+        documents: this.parseDocuments(data.documents),
         createdDate: new Date(data.created_at),
         updatedDate: new Date(data.updated_at),
       }
+      
+      console.log("[CRM] ✅ Contract created and mapped back:", createdContract.id)
+      return createdContract
+      
     } catch (error) {
-      console.error("[CRM] Contract creation failed:", error)
+      console.error("[CRM] ❌ Contract creation failed:", error)
       throw error
     }
   }
 
+  /**
+   * Met à jour un contrat existant
+   */
   static async updateContract(id: string, updates: Partial<Contract>): Promise<Contract> {
-    console.log("[CRM] Updating contract:", id, updates)
+    console.log("[CRM] ✏️ Updating contract:", id)
 
     if (await this.isDemoMode()) {
       console.log("[CRM] Using demo mode for contract update")
@@ -378,7 +430,7 @@ export class SupabaseClientDB {
           updatedDate: new Date(),
         }
         this.setDemoData("contracts", contracts)
-        console.log("[CRM] Contract updated in demo mode")
+        console.log("[CRM] ✅ Contract updated in demo mode")
         return contracts[index]
       }
       throw new Error("Contract not found in demo data")
@@ -388,26 +440,31 @@ export class SupabaseClientDB {
       console.log("[CRM] Using Supabase for contract update")
       const supabase = this.getClient()
 
-      // ✅ MAPPING COHÉRENT pour les updates : TypeScript (camelCase) → Supabase (underscore)
+      // 🔄 MAPPING pour les updates : TypeScript (camelCase) → Supabase (snake_case)
       const supabaseUpdates: any = { 
         updated_at: new Date().toISOString() 
       }
       
       if (updates.title !== undefined) supabaseUpdates.title = updates.title
       if (updates.description !== undefined) supabaseUpdates.description = updates.description
-      if (updates.organizationId !== undefined) supabaseUpdates.organization_id = updates.organizationId
-      if (updates.contactId !== undefined) supabaseUpdates.contact_id = updates.contactId
+      if (updates.organizationId !== undefined) supabaseUpdates.organization_id = updates.organizationId      // ✅ organizationId → organization_id
+      if (updates.contactId !== undefined) supabaseUpdates.contact_id = updates.contactId                    // ✅ contactId → contact_id
       if (updates.value !== undefined) supabaseUpdates.value = updates.value
       if (updates.currency !== undefined) supabaseUpdates.currency = updates.currency
       if (updates.status !== undefined) supabaseUpdates.status = updates.status
-      if (updates.assignedTo !== undefined) supabaseUpdates.assigned_to = updates.assignedTo
-      if (updates.expirationDate !== undefined) supabaseUpdates.expiration_date = updates.expirationDate
-      if (updates.signedDate !== undefined) supabaseUpdates.signed_date = updates.signedDate
-      if (updates.sentDate !== undefined) supabaseUpdates.sent_date = updates.sentDate
+      if (updates.assignedTo !== undefined) supabaseUpdates.assigned_to = updates.assignedTo                // ✅ assignedTo → assigned_to
+      if (updates.expirationDate !== undefined) supabaseUpdates.expiration_date = updates.expirationDate ? updates.expirationDate.toISOString() : null
+      if (updates.signedDate !== undefined) supabaseUpdates.signed_date = updates.signedDate ? updates.signedDate.toISOString() : null      // ✅ signedDate → signed_date
+      if (updates.sentDate !== undefined) supabaseUpdates.send_date = updates.sentDate ? updates.sentDate.toISOString() : null              // ✅ sentDate → send_date
       if (updates.notes !== undefined) supabaseUpdates.notes = updates.notes
-      if (updates.documents !== undefined) supabaseUpdates.documents = JSON.stringify(updates.documents)
+      if (updates.documents !== undefined) supabaseUpdates.documents = this.stringifyDocuments(updates.documents)
 
-      console.log("[CRM] Supabase update data:", supabaseUpdates)
+      console.log("[CRM] 📤 Supabase update data:", {
+        id,
+        fieldsToUpdate: Object.keys(supabaseUpdates),
+        organization_id: supabaseUpdates.organization_id,
+        send_date: supabaseUpdates.send_date
+      })
 
       const { data, error } = await supabase
         .from("contracts")
@@ -417,110 +474,154 @@ export class SupabaseClientDB {
         .single()
 
       if (error) {
-        console.error("[CRM] Contract update error:", error)
+        console.error("[CRM] ❌ Contract update error:", error)
         throw new Error(`Erreur mise à jour contrat: ${error.message}`)
       }
 
-      console.log("[CRM] Contract updated in Supabase:", data.id)
+      console.log("[CRM] ✅ Contract updated in Supabase:", data.id)
 
-      // ✅ MAPPING DE RETOUR cohérent
+      // 🔄 MAPPING DE RETOUR cohérent
       return {
         id: data.id,
         title: data.title,
         description: data.description,
-        organizationId: data.organization_id,
-        contactId: data.contact_id,
+        organizationId: data.organization_id,              // ✅ organization_id → organizationId
+        contactId: data.contact_id,                        // ✅ contact_id → contactId
         value: data.value,
         currency: data.currency,
         status: data.status,
-        assignedTo: data.assigned_to,
+        assignedTo: data.assigned_to,                      // ✅ assigned_to → assignedTo
         expirationDate: data.expiration_date ? new Date(data.expiration_date) : undefined,
-        signedDate: data.signed_date ? new Date(data.signed_date) : undefined,
-        sentDate: data.sent_date ? new Date(data.sent_date) : undefined,
+        signedDate: data.signed_date ? new Date(data.signed_date) : undefined,    // ✅ signed_date → signedDate
+        sentDate: data.send_date ? new Date(data.send_date) : undefined,          // ✅ send_date → sentDate
         notes: data.notes,
-        documents: typeof data.documents === "string" 
-          ? JSON.parse(data.documents) 
-          : (data.documents || []),
+        documents: this.parseDocuments(data.documents),
         createdDate: new Date(data.created_at),
         updatedDate: new Date(data.updated_at),
       }
     } catch (error) {
-      console.error("[CRM] Contract update failed:", error)
+      console.error("[CRM] ❌ Contract update failed:", error)
       throw error
     }
   }
 
+  /**
+   * Supprime un contrat
+   */
   static async deleteContract(id: string): Promise<void> {
-    console.log("[CRM] Deleting contract:", id)
+    console.log("[CRM] 🗑️ Deleting contract:", id)
 
     if (await this.isDemoMode()) {
       const contracts = this.getDemoData("contracts")
       const filtered = contracts.filter((contract: Contract) => contract.id !== id)
       this.setDemoData("contracts", filtered)
+      console.log("[CRM] ✅ Contract deleted from demo mode")
       return
     }
 
-    const supabase = this.getClient()
-    const { error } = await supabase.from("contracts").delete().eq("id", id)
-    if (error) throw error
+    try {
+      const supabase = this.getClient()
+      const { error } = await supabase
+        .from("contracts")
+        .delete()
+        .eq("id", id)
+
+      if (error) {
+        console.error("[CRM] ❌ Contract deletion error:", error)
+        throw new Error(`Erreur suppression contrat: ${error.message}`)
+      }
+
+      console.log("[CRM] ✅ Contract deleted from Supabase:", id)
+    } catch (error) {
+      console.error("[CRM] ❌ Contract deletion failed:", error)
+      throw error
+    }
   }
 
+  /**
+   * Récupère les contrats d'une organisation spécifique
+   */
   static async getContractsByOrganization(organizationId: string | number): Promise<Contract[]> {
-    console.log("[CRM] Loading contracts for organization:", organizationId)
+    console.log("[CRM] 🏢 Loading contracts for organization:", organizationId)
 
     if (await this.isDemoMode()) {
       const contracts = this.getDemoData("contracts")
-      const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
+      const searchId = organizationId.toString()
       const filtered = contracts.filter((contract: Contract) => 
-        contract.organizationId === searchId || 
-        contract.organizationId === organizationId
+        contract.organizationId?.toString() === searchId
       )
-      console.log("[CRM] Demo contracts for org loaded:", filtered.length)
+      console.log("[CRM] ✅ Demo contracts for org loaded:", filtered.length)
       return filtered
     }
 
     try {
       const supabase = this.getClient()
-      const supabaseId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
+      const supabaseId = organizationId.toString()
+      
+      console.log("[CRM] 📤 Querying contracts for organization_id:", supabaseId)
       
       const { data, error } = await supabase
         .from("contracts")
-        .select("*")
-        .eq("organization_id", supabaseId)
+        .select(`
+          id,
+          title,
+          description,
+          organization_id,
+          contact_id,
+          value,
+          currency,
+          status,
+          signed_date,
+          expiration_date,
+          assigned_to,
+          notes,
+          created_at,
+          updated_at,
+          send_date,
+          documents
+        `)
+        .eq("organization_id", supabaseId)                    // ✅ organization_id (nom exact de la colonne)
         .order("created_at", { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error("[CRM] ❌ Error loading contracts for org:", error)
+        throw new Error(`Erreur récupération contrats pour organisation: ${error.message}`)
+      }
       
-      console.log("[CRM] Supabase contracts for org loaded:", data?.length || 0)
+      console.log("[CRM] ✅ Raw contracts for org loaded:", data?.length || 0)
       
-      // ✅ MAPPING cohérent
-      return (data || []).map((contract) => ({
+      // 🔄 MAPPING cohérent
+      const mappedContracts = (data || []).map((contract) => ({
         id: contract.id,
         title: contract.title || "",
         description: contract.description || "",
-        organizationId: contract.organization_id,
-        contactId: contract.contact_id,
+        organizationId: contract.organization_id,          // ✅ organization_id → organizationId
+        contactId: contract.contact_id,                    // ✅ contact_id → contactId
         value: contract.value || 0,
         currency: contract.currency || "EUR",
         status: contract.status || "envoye",
-        assignedTo: contract.assigned_to || "",
+        assignedTo: contract.assigned_to || "",            // ✅ assigned_to → assignedTo
         expirationDate: contract.expiration_date ? new Date(contract.expiration_date) : undefined,
-        signedDate: contract.signed_date ? new Date(contract.signed_date) : undefined,
-        sentDate: contract.sent_date ? new Date(contract.sent_date) : undefined,
+        signedDate: contract.signed_date ? new Date(contract.signed_date) : undefined,    // ✅ signed_date → signedDate
+        sentDate: contract.send_date ? new Date(contract.send_date) : undefined,          // ✅ send_date → sentDate
         notes: contract.notes || "",
-        documents: typeof contract.documents === "string" 
-          ? JSON.parse(contract.documents) 
-          : (contract.documents || []),
+        documents: this.parseDocuments(contract.documents),
         createdDate: new Date(contract.created_at),
         updatedDate: new Date(contract.updated_at),
       }))
+      
+      console.log("[CRM] ✅ Contracts mapped for organization:", mappedContracts.length)
+      return mappedContracts
+      
     } catch (error) {
-      console.error("[CRM] Contracts for organization failed:", error)
+      console.error("[CRM] ❌ Contracts for organization failed:", error)
       return []
     }
   }
 
-  // ============ APPOINTMENTS - DÉJÀ FONCTIONNELS ============
+  // ============================================================================
+  // APPOINTMENTS - GARDE VOTRE CODE EXISTANT
+  // ============================================================================
   static async getAppointments(): Promise<any[]> {
     console.log("[CRM] Loading appointments...")
 
@@ -673,7 +774,31 @@ export class SupabaseClientDB {
     if (error) throw error
   }
 
-  // ============ UTILITAIRES ============
+  // ============================================================================
+  // UTILITAIRES PRIVÉS 
+  // ============================================================================
+  private static parseDocuments(documents: any): any[] {
+    if (!documents) return []
+    if (Array.isArray(documents)) return documents
+    if (typeof documents === "string") {
+      try {
+        return JSON.parse(documents)
+      } catch {
+        return []
+      }
+    }
+    return []
+  }
+
+  private static stringifyDocuments(documents: any): string {
+    if (!documents || !Array.isArray(documents)) return "[]"
+    try {
+      return JSON.stringify(documents)
+    } catch {
+      return "[]"
+    }
+  }
+
   private static getDemoData(key: string) {
     if (typeof window === "undefined") return []
     const data = localStorage.getItem(`demo_${key}`)
