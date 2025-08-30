@@ -177,7 +177,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
       
       // Load contracts
       const contractsData = await SupabaseClientDB.getContractsByOrganization(organization.id)
-      console.log("[ORG_MODAL] Contracts loaded:", contractsData.length)
+      console.log("[ORG_MODAL] Contracts loaded:", contractsData.length, contractsData)
       setContracts(contractsData)
       
     } catch (error) {
@@ -358,21 +358,21 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         }),
       )
 
-      // ✅ DONNÉES COHÉRENTES EN camelCase
+      // ✅ DONNÉES COHÉRENTES EN snake_case pour la DB
       const contractInput: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
         title: `Contrat - ${organization.name}`,
         description: contractForm.description,
-        organizationId: organization.id.toString(),     // ✅ camelCase
-        contactId: null,
+        organization_id: organization.id.toString(),     // ✅ snake_case pour la DB
+        contact_id: null,                                // ✅ snake_case pour la DB
         value: 0,
         currency: "EUR",
         status: contractForm.status,
-        assignedTo: "",                                 // ✅ camelCase
-        expirationDate: undefined,
-        signedDate: contractForm.status === "signe" && contractForm.signatureDate   // ✅ camelCase
+        assigned_to: "",                                 // ✅ snake_case pour la DB
+        expiration_date: undefined,                      // ✅ snake_case pour la DB
+        signed_date: contractForm.status === "signe" && contractForm.signatureDate   // ✅ snake_case pour la DB
           ? new Date(contractForm.signatureDate) 
           : undefined,
-        sentDate: contractForm.sentDate ? new Date(contractForm.sentDate) : undefined,  // ✅ camelCase
+        sent_date: contractForm.sentDate ? new Date(contractForm.sentDate) : undefined,  // ✅ snake_case pour la DB
         notes: "",
         documents: documents,
       }
@@ -404,15 +404,15 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     console.log("[ORG_MODAL] Starting contract edit:", contract.id)
     setEditingContract(contract)
     
-    // ✅ MAPPING COHÉRENT pour l'édition
+    // ✅ MAPPING COHÉRENT pour l'édition - gérer les deux formats
     setContractForm({
       description: contract.description || "",
       status: (contract.status as ContractStatus) || "envoye",
-      sentDate: contract.sentDate                    // ✅ cohérent
-        ? new Date(contract.sentDate).toISOString().split("T")[0] 
+      sentDate: (contract.sent_date || contract.sentDate)                    // ✅ gérer les deux formats
+        ? new Date(contract.sent_date || contract.sentDate).toISOString().split("T")[0] 
         : "",
-      signatureDate: contract.signedDate            // ✅ cohérent
-        ? new Date(contract.signedDate).toISOString().split("T")[0]
+      signatureDate: (contract.signed_date || contract.signedDate)            // ✅ gérer les deux formats
+        ? new Date(contract.signed_date || contract.signedDate).toISOString().split("T")[0]
         : "",
     })
     
@@ -1135,93 +1135,98 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                   </CardContent>
                 </Card>
               ) : (
-                contracts.map((contract) => (
-                  <Card key={contract.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="pt-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <Badge className={CONTRACT_STATUS[contract.status as ContractStatus]?.color || "bg-gray-100 text-gray-800"}>
-                              {CONTRACT_STATUS[contract.status as ContractStatus]?.label || contract.status}
-                            </Badge>
-                            {contract.title && (
-                              <span className="text-lg font-semibold">{contract.title}</span>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground mb-2">
-                            {/* ✅ AFFICHAGE COHÉRENT DES DATES */}
-                            {contract.sentDate && (
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
-                                <span>Envoyé le: {new Date(contract.sentDate).toLocaleDateString("fr-FR")}</span>
-                              </div>
-                            )}
-                            {contract.signedDate && (
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
-                                <span>Signé le: {new Date(contract.signedDate).toLocaleDateString("fr-FR")}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {contract.description && (
-                            <p className="text-sm text-gray-700 mb-3">{contract.description}</p>
-                          )}
-
-                          {/* Documents */}
-                          {contract.documents && contract.documents.length > 0 && (
-                            <div className="mt-3 p-3 bg-gray-50 rounded">
-                              <p className="text-sm font-medium mb-2">Documents ({contract.documents.length}) :</p>
-                              <div className="space-y-1">
-                                {contract.documents.map((doc, index) => (
-                                  <div key={index} className="flex items-center justify-between text-sm">
-                                    <div className="flex items-center gap-2">
-                                      <FileText className="h-3 w-3" />
-                                      <span>{doc.name}</span>
-                                      <span className="text-xs text-gray-500">({(doc.size / 1024).toFixed(1)} KB)</span>
-                                      <Badge variant="outline" className="text-xs px-1 py-0">
-                                        {doc.type?.split("/")[1]?.toUpperCase() || "FILE"}
-                                      </Badge>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 w-6 p-0 hover:bg-blue-100"
-                                      onClick={() => downloadDocument(doc)}
-                                      title={`Télécharger ${doc.name}`}
-                                    >
-                                      <Download className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
+                contracts.map((contract) => {
+                  // ✅ Gérer les deux formats de champs
+                  const contractOrgId = (contract.organization_id || contract.organizationId || "").toString()
+                  
+                  return (
+                    <Card key={contract.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="pt-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Badge className={CONTRACT_STATUS[contract.status as ContractStatus]?.color || "bg-gray-100 text-gray-800"}>
+                                {CONTRACT_STATUS[contract.status as ContractStatus]?.label || contract.status}
+                              </Badge>
+                              {contract.title && (
+                                <span className="text-lg font-semibold">{contract.title}</span>
+                              )}
                             </div>
-                          )}
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground mb-2">
+                              {/* ✅ AFFICHAGE COHÉRENT DES DATES - gérer les deux formats */}
+                              {(contract.sent_date || contract.sentDate) && (
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>Envoyé le: {new Date(contract.sent_date || contract.sentDate).toLocaleDateString("fr-FR")}</span>
+                                </div>
+                              )}
+                              {(contract.signed_date || contract.signedDate) && (
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>Signé le: {new Date(contract.signed_date || contract.signedDate).toLocaleDateString("fr-FR")}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {contract.description && (
+                              <p className="text-sm text-gray-700 mb-3">{contract.description}</p>
+                            )}
+
+                            {/* Documents */}
+                            {contract.documents && contract.documents.length > 0 && (
+                              <div className="mt-3 p-3 bg-gray-50 rounded">
+                                <p className="text-sm font-medium mb-2">Documents ({contract.documents.length}) :</p>
+                                <div className="space-y-1">
+                                  {contract.documents.map((doc, index) => (
+                                    <div key={index} className="flex items-center justify-between text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <FileText className="h-3 w-3" />
+                                        <span>{doc.name}</span>
+                                        <span className="text-xs text-gray-500">({(doc.size / 1024).toFixed(1)} KB)</span>
+                                        <Badge variant="outline" className="text-xs px-1 py-0">
+                                          {doc.type?.split("/")[1]?.toUpperCase() || "FILE"}
+                                        </Badge>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 hover:bg-blue-100"
+                                        onClick={() => downloadDocument(doc)}
+                                        title={`Télécharger ${doc.name}`}
+                                      >
+                                        <Download className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditContract(contract)}
+                              disabled={loading}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteContract(contract.id)}
+                              disabled={loading}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditContract(contract)}
-                            disabled={loading}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteContract(contract.id)}
-                            disabled={loading}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                      </CardContent>
+                    </Card>
+                  )
+                })
               )}
             </div>
           </TabsContent>
