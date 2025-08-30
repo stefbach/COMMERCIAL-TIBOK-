@@ -70,7 +70,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
       console.log("[CONTRACTS] Loading contracts...")
       setLoading(true)
       const data = await SupabaseClientDB.getContracts()
-      console.log("[CONTRACTS] Contracts loaded:", data.length)
+      console.log("[CONTRACTS] Contracts loaded:", data.length, data)
       setContracts(data)
     } catch (error) {
       console.error("[CONTRACTS] Error loading contracts:", error)
@@ -116,21 +116,21 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         }),
       )
 
-      // ✅ DONNÉES COHÉRENTES EN camelCase
+      // ✅ DONNÉES COHÉRENTES - UTILISER snake_case POUR LA DB
       const contractInput: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
         title: `Contrat - ${getOrganizationName(formData.organizationId)}`,
         description: formData.description,
-        organizationId: formData.organizationId,        // ✅ camelCase
-        contactId: null,
+        organization_id: formData.organizationId,        // ✅ snake_case pour la DB
+        contact_id: null,                                // ✅ snake_case pour la DB
         value: 0,
         currency: "EUR",
         status: formData.status,
-        assignedTo: "",                                 // ✅ camelCase
-        expirationDate: undefined,
-        signedDate: formData.status === "signe" && formData.signatureDate   // ✅ camelCase
+        assigned_to: "",                                 // ✅ snake_case pour la DB
+        expiration_date: undefined,                      // ✅ snake_case pour la DB
+        signed_date: formData.status === "signe" && formData.signatureDate   // ✅ snake_case pour la DB
           ? new Date(formData.signatureDate) 
           : undefined,
-        sentDate: formData.sentDate ? new Date(formData.sentDate) : undefined,  // ✅ camelCase
+        sent_date: formData.sentDate ? new Date(formData.sentDate) : undefined,  // ✅ snake_case pour la DB
         notes: "",
         documents: documents,
       }
@@ -175,16 +175,16 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     console.log("[CONTRACTS] Starting edit for contract:", contract.id)
     setEditingContract(contract)
     
-    // ✅ MAPPING COHÉRENT pour l'édition
+    // ✅ MAPPING COHÉRENT pour l'édition - gérer les deux formats
     setFormData({
       description: contract.description || "",
-      organizationId: contract.organizationId || "",     // ✅ cohérent
+      organizationId: (contract.organization_id || contract.organizationId || "").toString(),     // ✅ gérer les deux formats
       status: (contract.status as ContractStatus) || "envoye",
-      sentDate: contract.sentDate                        // ✅ cohérent
-        ? new Date(contract.sentDate).toISOString().split("T")[0] 
+      sentDate: (contract.sent_date || contract.sentDate)                        // ✅ gérer les deux formats
+        ? new Date(contract.sent_date || contract.sentDate).toISOString().split("T")[0] 
         : "",
-      signatureDate: contract.signedDate                 // ✅ cohérent
-        ? new Date(contract.signedDate).toISOString().split("T")[0] 
+      signatureDate: (contract.signed_date || contract.signedDate)                 // ✅ gérer les deux formats
+        ? new Date(contract.signed_date || contract.signedDate).toISOString().split("T")[0] 
         : "",
     })
     
@@ -253,18 +253,21 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
   // ============ UTILITY FUNCTIONS ============
   const getOrganizationName = (orgId: string) => {
     if (!orgId) return "Aucune organisation"
-    const org = organizations.find((o) => o.id.toString() === orgId)
-    return org ? org.name : `Organisation #${orgId.substring(0, 8)}...`
+    const org = organizations.find((o) => o.id.toString() === orgId.toString())
+    return org ? org.name : `Organisation #${orgId.toString().substring(0, 8)}...`
   }
 
   const getOrganizationDetails = (orgId: string) => {
     if (!orgId) return null
-    return organizations.find((o) => o.id.toString() === orgId)
+    return organizations.find((o) => o.id.toString() === orgId.toString())
   }
 
   const filteredContracts = contracts.filter((contract) => {
+    // ✅ Gérer les deux formats de champs
+    const contractOrgId = (contract.organization_id || contract.organizationId || "").toString()
+    
     if (filters.status !== "all" && contract.status !== filters.status) return false
-    if (filters.organization !== "all" && contract.organizationId !== filters.organization) return false
+    if (filters.organization !== "all" && contractOrgId !== filters.organization) return false
     return true
   })
 
@@ -529,7 +532,8 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
           </Card>
         ) : (
           filteredContracts.map((contract) => {
-            const organization = getOrganizationDetails(contract.organizationId || "")
+            const contractOrgId = (contract.organization_id || contract.organizationId || "").toString()
+            const organization = getOrganizationDetails(contractOrgId)
 
             return (
               <Card key={contract.id} className="hover:shadow-md transition-shadow">
@@ -558,7 +562,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                         <AlertTriangle className="h-6 w-6" />
                         <div>
                           <h2 className="text-xl font-bold">Organisation introuvable</h2>
-                          <p className="text-orange-100 text-sm">ID: {contract.organizationId}</p>
+                          <p className="text-orange-100 text-sm">ID: {contractOrgId}</p>
                         </div>
                       </div>
                     </div>
@@ -577,17 +581,17 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-                        {/* ✅ AFFICHAGE COHÉRENT DES DATES */}
-                        {contract.sentDate && (
+                        {/* ✅ AFFICHAGE COHÉRENT DES DATES - gérer les deux formats */}
+                        {(contract.sent_date || contract.sentDate) && (
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            <span>Envoyé le: {new Date(contract.sentDate).toLocaleDateString("fr-FR")}</span>
+                            <span>Envoyé le: {new Date(contract.sent_date || contract.sentDate).toLocaleDateString("fr-FR")}</span>
                           </div>
                         )}
-                        {contract.signedDate && (
+                        {(contract.signed_date || contract.signedDate) && (
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            <span>Signé le: {new Date(contract.signedDate).toLocaleDateString("fr-FR")}</span>
+                            <span>Signé le: {new Date(contract.signed_date || contract.signedDate).toLocaleDateString("fr-FR")}</span>
                           </div>
                         )}
                       </div>
