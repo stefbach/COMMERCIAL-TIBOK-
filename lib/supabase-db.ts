@@ -165,35 +165,73 @@ export class SupabaseClientDB {
     }
   }
 
-  static async updateOrganization(id: number, updates: Partial<Organization>): Promise<Organization> {
+  // ✅ CORRECTION DÉFINITIVE : Support des ID number ET string
+  static async updateOrganization(id: number | string, updates: Partial<Organization>): Promise<Organization> {
+    console.log("[v0] updateOrganization called with ID:", id, typeof id)
+    
     if (await this.isDemoMode()) {
+      console.log("[v0] Using demo mode for organization update")
       const organizations = this.getDemoData("organizations")
-      const index = organizations.findIndex((org: Organization) => org.id === id)
+      
+      // Conversion de l'ID pour la comparaison en mode démo
+      const searchId = typeof id === 'string' ? parseInt(id) : id
+      const index = organizations.findIndex((org: Organization) => org.id === searchId)
+      
       if (index !== -1) {
-        organizations[index] = { ...organizations[index], ...updates, updated_at: new Date().toISOString() }
+        organizations[index] = { 
+          ...organizations[index], 
+          ...updates, 
+          updated_at: new Date().toISOString() 
+        }
         this.setDemoData("organizations", organizations)
+        console.log("[v0] Organization updated in demo mode")
         return organizations[index]
       }
-      throw new Error("Organization not found")
+      throw new Error("Organization not found in demo data")
     }
 
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("organizations").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id).select().single()
+    console.log("[v0] Using Supabase for organization update")
+    try {
+      const supabase = this.getClient()
+      
+      // Pour Supabase, on utilise directement l'ID (qui devrait être un UUID string)
+      const supabaseId = typeof id === 'number' ? id.toString() : id
+      
+      const { data, error } = await supabase
+        .from("organizations")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", supabaseId)
+        .select()
+        .single()
 
-    if (error) throw error
-    return data
+      if (error) {
+        console.error("[v0] Supabase update failed:", error)
+        throw error
+      }
+      
+      console.log("[v0] Organization updated in Supabase successfully")
+      return data
+    } catch (error) {
+      console.error("[v0] Supabase update error:", error)
+      throw error
+    }
   }
 
-  static async deleteOrganization(id: number): Promise<void> {
+  // ✅ CORRECTION DÉFINITIVE : Support des ID number ET string
+  static async deleteOrganization(id: number | string): Promise<void> {
+    console.log("[v0] deleteOrganization called with ID:", id, typeof id)
+    
     if (await this.isDemoMode()) {
       const organizations = this.getDemoData("organizations")
-      const filtered = organizations.filter((org: Organization) => org.id !== id)
+      const searchId = typeof id === 'string' ? parseInt(id) : id
+      const filtered = organizations.filter((org: Organization) => org.id !== searchId)
       this.setDemoData("organizations", filtered)
       return
     }
 
     const supabase = this.getClient()
-    const { error } = await supabase.from("organizations").delete().eq("id", id)
+    const supabaseId = typeof id === 'number' ? id.toString() : id
+    const { error } = await supabase.from("organizations").delete().eq("id", supabaseId)
 
     if (error) throw error
   }
@@ -230,17 +268,19 @@ export class SupabaseClientDB {
     return data
   }
 
-  static async getContactsByOrganization(organizationId: number): Promise<Contact[]> {
+  static async getContactsByOrganization(organizationId: number | string): Promise<Contact[]> {
     if (await this.isDemoMode()) {
       const contacts = this.getDemoData("contacts")
-      return contacts.filter((contact: Contact) => contact.organization_id === organizationId)
+      const searchId = typeof organizationId === 'string' ? parseInt(organizationId) : organizationId
+      return contacts.filter((contact: Contact) => contact.organization_id === searchId)
     }
 
     const supabase = this.getClient()
+    const supabaseId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
     const { data, error } = await supabase
       .from("contacts")
       .select("*")
-      .eq("organization_id", organizationId)
+      .eq("organization_id", supabaseId)
       .order("created_at", { ascending: false })
 
     if (error) throw error
@@ -522,14 +562,19 @@ export class SupabaseClientDB {
     return data || []
   }
 
-  static async getAppointmentsByOrganization(organizationId: string): Promise<Appointment[]> {
+  static async getAppointmentsByOrganization(organizationId: string | number): Promise<Appointment[]> {
     console.log("[v0] Loading appointments for organization:", organizationId)
 
     if (await this.isDemoMode()) {
       console.log("[v0] Demo mode for appointments loading: true")
       const appointments = this.getDemoData("appointments")
       console.log("[v0] Raw appointments data:", appointments)
-      const filtered = appointments.filter((appointment: Appointment) => appointment.organization_id === organizationId)
+      
+      // Conversion pour comparaison en mode démo
+      const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
+      const filtered = appointments.filter((appointment: Appointment) => 
+        appointment.organization_id === searchId || appointment.organization_id === organizationId
+      )
       console.log("[v0] Filtered appointments:", filtered.length)
       return filtered
     }
@@ -538,10 +583,11 @@ export class SupabaseClientDB {
     const supabase = this.getClient()
 
     try {
+      const supabaseId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
       const { data, error } = await supabase
         .from("appointments")
         .select("*")
-        .eq("organization_id", organizationId)
+        .eq("organization_id", supabaseId)
         .order("appointment_date", { ascending: false })
 
       if (error) throw error
@@ -551,8 +597,9 @@ export class SupabaseClientDB {
         console.log("[v0] Supabase returned empty data, checking localStorage fallback")
         const appointments = this.getDemoData("appointments")
         console.log("[v0] Fallback appointments data:", appointments)
+        const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
         const filtered = appointments.filter(
-          (appointment: Appointment) => appointment.organization_id === organizationId,
+          (appointment: Appointment) => appointment.organization_id === searchId || appointment.organization_id === organizationId
         )
         console.log("[v0] Fallback appointments loaded:", filtered.length)
         return filtered
@@ -563,7 +610,10 @@ export class SupabaseClientDB {
       console.log("[v0] Supabase appointments failed, falling back to demo mode:", error)
       const appointments = this.getDemoData("appointments")
       console.log("[v0] Fallback appointments data:", appointments)
-      const filtered = appointments.filter((appointment: Appointment) => appointment.organization_id === organizationId)
+      const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
+      const filtered = appointments.filter((appointment: Appointment) => 
+        appointment.organization_id === searchId || appointment.organization_id === organizationId
+      )
       console.log("[v0] Fallback appointments loaded:", filtered.length)
       return filtered
     }
@@ -827,13 +877,17 @@ export class SupabaseClientDB {
     if (error) throw error
   }
 
-  static async getContractsByOrganization(organizationId: string): Promise<Contract[]> {
+  static async getContractsByOrganization(organizationId: string | number): Promise<Contract[]> {
     console.log("[v0] Loading contracts for organization:", organizationId)
 
     if (await this.isDemoMode()) {
       console.log("[v0] Demo mode for contracts loading: true")
       const contracts = this.getDemoData("contracts")
-      const filtered = contracts.filter((contract: Contract) => contract.organizationId === organizationId)
+      const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
+      const filtered = contracts.filter((contract: Contract) => 
+        contract.organizationId === searchId || contract.organizationId === organizationId ||
+        contract.organization_id === searchId || contract.organization_id === organizationId
+      )
       console.log("[v0] Demo contracts loaded:", filtered.length)
       return filtered
     }
@@ -842,10 +896,11 @@ export class SupabaseClientDB {
     const supabase = this.getClient()
 
     try {
+      const supabaseId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
       const { data, error } = await supabase
         .from("contracts")
         .select("*")
-        .eq("organization_id", organizationId)
+        .eq("organization_id", supabaseId)
         .order("created_date", { ascending: false })
 
       if (error) throw error
@@ -854,7 +909,11 @@ export class SupabaseClientDB {
     } catch (error) {
       console.log("[v0] Supabase contracts failed, falling back to demo mode:", error)
       const contracts = this.getDemoData("contracts")
-      const filtered = contracts.filter((contract: Contract) => contract.organizationId === organizationId)
+      const searchId = typeof organizationId === 'number' ? organizationId.toString() : organizationId
+      const filtered = contracts.filter((contract: Contract) => 
+        contract.organizationId === searchId || contract.organizationId === organizationId ||
+        contract.organization_id === searchId || contract.organization_id === organizationId
+      )
       console.log("[v0] Fallback contracts loaded:", filtered.length)
       return filtered
     }
