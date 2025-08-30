@@ -150,6 +150,7 @@ export function Organizations() {
     secteur: "",
     district: "",
     categorie: "",
+    region: "",
     status: "",
     priority: "",
   })
@@ -170,7 +171,7 @@ export function Organizations() {
             name: "Hotel Le Mauricien",
             industry: "Hôtellerie",
             category: "4 étoiles",
-            region: "Port Louis",
+            region: "Ouest",
             district: "Port Louis",
             city: "Port Louis",
             address: "123 Royal Street",
@@ -193,7 +194,7 @@ export function Organizations() {
             name: "Resort Tropical Paradise",
             industry: "Hôtellerie",
             category: "5 étoiles",
-            region: "Grand Baie",
+            region: "Nord",
             district: "Rivière du Rempart",
             city: "Grand Baie",
             address: "456 Coastal Road",
@@ -270,6 +271,7 @@ export function Organizations() {
       secteur: "",
       district: "",
       categorie: "",
+      region: "",
       status: "",
       priority: "",
     })
@@ -289,6 +291,7 @@ export function Organizations() {
       (!filters.secteur || org.secteur?.toLowerCase().includes(filters.secteur.toLowerCase())) &&
       (!filters.district || org.district?.toLowerCase().includes(filters.district.toLowerCase())) &&
       (!filters.categorie || org.category?.toLowerCase().includes(filters.categorie.toLowerCase())) &&
+      (!filters.region || org.region?.toLowerCase() === filters.region.toLowerCase()) &&
       (!filters.status || org.status?.toLowerCase() === filters.status.toLowerCase()) &&
       (!filters.priority || org.priority?.toLowerCase() === filters.priority.toLowerCase())
 
@@ -527,7 +530,7 @@ export function Organizations() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 p-4 bg-muted/50 rounded-lg">
             <Select value={filters.type} onValueChange={(value) => setFilters((prev) => ({ ...prev, type: value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Type" />
@@ -604,6 +607,23 @@ export function Organizations() {
                     {category}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.region}
+              onValueChange={(value) => setFilters((prev) => ({ ...prev, region: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Région" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les régions</SelectItem>
+                <SelectItem value="Nord">Nord</SelectItem>
+                <SelectItem value="Sud">Sud</SelectItem>
+                <SelectItem value="Est">Est</SelectItem>
+                <SelectItem value="Ouest">Ouest</SelectItem>
+                <SelectItem value="Centre">Centre</SelectItem>
               </SelectContent>
             </Select>
 
