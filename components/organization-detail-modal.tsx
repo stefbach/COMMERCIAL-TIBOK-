@@ -62,6 +62,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     contact_fonction: "",
     status: "Active" as const,
     priority: "Medium" as const,
+    notes: "", // Ajouté explicitement
   })
 
   const [appointmentForm, setAppointmentForm] = useState({
@@ -84,6 +85,8 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
 
   useEffect(() => {
     if (organization) {
+      console.log("[DEBUG] Loading organization data:", organization)
+      
       setNotes(organization.notes || "")
       setOrganizationForm({
         name: organization.name || "",
@@ -103,6 +106,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         contact_fonction: organization.contact_fonction || "",
         status: organization.status || "Active",
         priority: organization.priority || "Medium",
+        notes: organization.notes || "",
       })
       loadAppointments()
       loadContracts()
@@ -133,12 +137,71 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     if (!organization) return
     setLoading(true)
     try {
+      // Mise à jour des notes dans l'état du formulaire aussi
+      setOrganizationForm(prev => ({ ...prev, notes }))
+      
       await SupabaseClientDB.updateOrganization(organization.id, { notes })
       toast.success("Notes sauvegardées avec succès")
       onUpdate()
     } catch (error) {
       console.error("Error saving notes:", error)
       toast.error("Erreur lors de la sauvegarde des notes")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // FONCTION DE SAUVEGARDE CORRIGÉE
+  const handleSaveOrganization = async () => {
+    if (!organization) return
+    setLoading(true)
+    
+    try {
+      console.log("[DEBUG] Saving organization with form data:", organizationForm)
+      
+      // Construction des données mises à jour avec mappage correct des champs
+      const updatedData = {
+        name: organizationForm.name.trim(),
+        industry: organizationForm.industry.trim(),
+        category: organizationForm.category,
+        region: organizationForm.region,
+        zone_geographique: organizationForm.zone_geographique.trim(),
+        district: organizationForm.district.trim(),
+        city: organizationForm.city.trim(),
+        address: organizationForm.address.trim(),
+        secteur: organizationForm.secteur.trim(),
+        website: organizationForm.website.trim(),
+        nb_chambres: organizationForm.nb_chambres ? Number.parseInt(organizationForm.nb_chambres) : null,
+        phone: organizationForm.phone.trim(),
+        email: organizationForm.email.trim(),
+        contact_principal: organizationForm.contact_principal.trim(),
+        contact_fonction: organizationForm.contact_fonction.trim(),
+        status: organizationForm.status,
+        priority: organizationForm.priority,
+        notes: organizationForm.notes.trim(),
+        // Ajouter explicitement la date de mise à jour
+        updated_at: new Date().toISOString(),
+      }
+      
+      console.log("[DEBUG] Data to be saved:", updatedData)
+      
+      // Validation des données obligatoires
+      if (!updatedData.name) {
+        toast.error("Le nom de l'organisation est obligatoire")
+        return
+      }
+      
+      const result = await SupabaseClientDB.updateOrganization(organization.id, updatedData)
+      console.log("[DEBUG] Update result:", result)
+      
+      toast.success("Organisation mise à jour avec succès")
+      
+      // Forcer le rechargement des données
+      await onUpdate()
+      
+    } catch (error) {
+      console.error("Error updating organization:", error)
+      toast.error(`Erreur lors de la mise à jour: ${(error as Error).message}`)
     } finally {
       setLoading(false)
     }
@@ -225,25 +288,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
       type: "Meeting",
       status: "Scheduled",
     })
-  }
-
-  const handleSaveOrganization = async () => {
-    if (!organization) return
-    setLoading(true)
-    try {
-      const updatedData = {
-        ...organizationForm,
-        nb_chambres: organizationForm.nb_chambres ? Number.parseInt(organizationForm.nb_chambres) : null,
-      }
-      await SupabaseClientDB.updateOrganization(organization.id, updatedData)
-      toast.success("Organisation mise à jour avec succès")
-      onUpdate()
-    } catch (error) {
-      console.error("Error updating organization:", error)
-      toast.error("Erreur lors de la mise à jour de l'organisation")
-    } finally {
-      setLoading(false)
-    }
   }
 
   // GESTION FICHIERS SYNCHRONISÉE avec contracts-tab.tsx
@@ -438,14 +482,30 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
+            {/* DEBUG INFO - Supprimer en production */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="p-3 bg-gray-100 rounded text-xs">
+                <strong>DEBUG:</strong> Organization ID: {organization.id}
+                <br />
+                Form name: {organizationForm.name}
+                <br />
+                Original name: {organization.name}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="name">Nom de l'organisation</Label>
+                <Label htmlFor="name">Nom de l'organisation *</Label>
                 <Input
                   id="name"
                   value={organizationForm.name}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, name: e.target.value })}
+                  onChange={(e) => {
+                    console.log("[DEBUG] Name changed to:", e.target.value)
+                    setOrganizationForm({ ...organizationForm, name: e.target.value })
+                  }}
                   placeholder="Nom de l'organisation"
+                  className="border-2"
+                  required
                 />
               </div>
               <div>
@@ -470,6 +530,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                     <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Aucune</SelectItem>
                     <SelectItem value="1 étoile">1 étoile</SelectItem>
                     <SelectItem value="2 étoiles">2 étoiles</SelectItem>
                     <SelectItem value="3 étoiles">3 étoiles</SelectItem>
@@ -510,6 +571,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                     <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Aucune</SelectItem>
                     <SelectItem value="Nord">Nord</SelectItem>
                     <SelectItem value="Sud">Sud</SelectItem>
                     <SelectItem value="Est">Est</SelectItem>
@@ -648,9 +710,14 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
               </div>
             </div>
 
-            <Button onClick={handleSaveOrganization} disabled={loading} className="w-full">
+            <Button 
+              onClick={handleSaveOrganization} 
+              disabled={loading || !organizationForm.name.trim()} 
+              className="w-full bg-green-600 hover:bg-green-700"
+              size="lg"
+            >
               <Save className="w-4 h-4 mr-2" />
-              {loading ? "Sauvegarde..." : "Sauvegarder les modifications"}
+              {loading ? "Sauvegarde en cours..." : "✓ Sauvegarder les modifications"}
             </Button>
           </TabsContent>
 
@@ -664,7 +731,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                 placeholder="Ajoutez vos notes sur cette organisation..."
                 className="min-h-[200px]"
               />
-              <Button onClick={handleSaveNotes} disabled={loading}>
+              <Button onClick={handleSaveNotes} disabled={loading} className="w-full">
                 <Save className="w-4 h-4 mr-2" />
                 {loading ? "Sauvegarde..." : "Sauvegarder les notes"}
               </Button>
