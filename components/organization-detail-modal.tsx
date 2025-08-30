@@ -201,7 +201,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     console.log("[ORG_MODAL] Saving organization:", organization.id, organizationForm.name)
     
     try {
-      // ✅ DONNÉES PROPRES POUR LA MISE À JOUR
+      // ✅ DONNÉES PROPRES POUR LA MISE À JOUR - utilise le format de votre DB
       const updatedData = {
         name: organizationForm.name.trim(),
         industry: organizationForm.industry.trim() || null,
@@ -358,21 +358,21 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         }),
       )
 
-      // ✅ DONNÉES COHÉRENTES EN snake_case pour la DB
+      // ✅ DONNÉES EN camelCase POUR CORRESPONDRE AU SCHÉMA DB
       const contractInput: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
         title: `Contrat - ${organization.name}`,
         description: contractForm.description,
-        organization_id: organization.id.toString(),     // ✅ snake_case pour la DB
-        contact_id: null,                                // ✅ snake_case pour la DB
+        organizationId: organization.id.toString(),     // ✅ camelCase pour correspondre à la DB
+        contactId: null,                                // ✅ camelCase pour correspondre à la DB
         value: 0,
         currency: "EUR",
         status: contractForm.status,
-        assigned_to: "",                                 // ✅ snake_case pour la DB
-        expiration_date: undefined,                      // ✅ snake_case pour la DB
-        signed_date: contractForm.status === "signe" && contractForm.signatureDate   // ✅ snake_case pour la DB
+        assignedTo: "",                                 // ✅ camelCase pour correspondre à la DB
+        expirationDate: undefined,                      // ✅ camelCase pour correspondre à la DB
+        signedDate: contractForm.status === "signe" && contractForm.signatureDate   // ✅ camelCase pour correspondre à la DB
           ? new Date(contractForm.signatureDate) 
           : undefined,
-        sent_date: contractForm.sentDate ? new Date(contractForm.sentDate) : undefined,  // ✅ snake_case pour la DB
+        sentDate: contractForm.sentDate ? new Date(contractForm.sentDate) : undefined,  // ✅ camelCase pour correspondre à la DB
         notes: "",
         documents: documents,
       }
@@ -401,18 +401,18 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
   }
 
   const handleEditContract = (contract: Contract) => {
-    console.log("[ORG_MODAL] Starting contract edit:", contract.id)
+    console.log("[ORG_MODAL] Starting contract edit:", contract.id, contract)
     setEditingContract(contract)
     
-    // ✅ MAPPING COHÉRENT pour l'édition - gérer les deux formats
+    // ✅ MAPPING COHÉRENT pour l'édition - camelCase
     setContractForm({
       description: contract.description || "",
       status: (contract.status as ContractStatus) || "envoye",
-      sentDate: (contract.sent_date || contract.sentDate)                    // ✅ gérer les deux formats
-        ? new Date(contract.sent_date || contract.sentDate).toISOString().split("T")[0] 
+      sentDate: contract.sentDate                    // ✅ camelCase
+        ? new Date(contract.sentDate).toISOString().split("T")[0] 
         : "",
-      signatureDate: (contract.signed_date || contract.signedDate)            // ✅ gérer les deux formats
-        ? new Date(contract.signed_date || contract.signedDate).toISOString().split("T")[0]
+      signatureDate: contract.signedDate            // ✅ camelCase
+        ? new Date(contract.signedDate).toISOString().split("T")[0]
         : "",
     })
     
@@ -998,7 +998,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                   <CardTitle className="flex items-center justify-between">
                     {editingContract ? "Modifier le contrat" : "Nouveau contrat"}
                     <Button variant="ghost" size="sm" onClick={resetContractForm}>
-                      <X className="w-4 h-4" />
+                      <X className="w-4 w-4" />
                     </Button>
                   </CardTitle>
                 </CardHeader>
@@ -1136,8 +1136,8 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                 </Card>
               ) : (
                 contracts.map((contract) => {
-                  // ✅ Gérer les deux formats de champs
-                  const contractOrgId = (contract.organization_id || contract.organizationId || "").toString()
+                  // ✅ Utilise camelCase pour correspondre au schéma DB
+                  const contractOrgId = (contract.organizationId || "").toString()
                   
                   return (
                     <Card key={contract.id} className="hover:shadow-md transition-shadow">
@@ -1154,17 +1154,17 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground mb-2">
-                              {/* ✅ AFFICHAGE COHÉRENT DES DATES - gérer les deux formats */}
-                              {(contract.sent_date || contract.sentDate) && (
+                              {/* ✅ AFFICHAGE COHÉRENT DES DATES - camelCase */}
+                              {contract.sentDate && (
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4" />
-                                  <span>Envoyé le: {new Date(contract.sent_date || contract.sentDate).toLocaleDateString("fr-FR")}</span>
+                                  <span>Envoyé le: {new Date(contract.sentDate).toLocaleDateString("fr-FR")}</span>
                                 </div>
                               )}
-                              {(contract.signed_date || contract.signedDate) && (
+                              {contract.signedDate && (
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4" />
-                                  <span>Signé le: {new Date(contract.signed_date || contract.signedDate).toLocaleDateString("fr-FR")}</span>
+                                  <span>Signé le: {new Date(contract.signedDate).toLocaleDateString("fr-FR")}</span>
                                 </div>
                               )}
                             </div>
