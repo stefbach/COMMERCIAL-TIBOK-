@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -12,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Clock, MapPin, Plus, Save, X, Edit, Trash2, FileText, Upload, Download } from "lucide-react"
+import { Calendar, Clock, MapPin, Plus, Save, X, Edit, Trash2, FileText, Upload, Download, AlertCircle } from "lucide-react"
 import type { Organization, Appointment, Contract } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
 import { toast } from "sonner"
@@ -24,31 +23,70 @@ interface OrganizationDetailModalProps {
   onUpdate: () => void
 }
 
-// Statuts simplifiés - SYNCHRONISÉ avec contracts-tab.tsx
-const CONTRACT_STATUS_LABELS = {
-  "envoye": "Envoyé",
-  "signe": "Signé", 
-  "annule": "Annulé"
+// ✅ STATUTS COHÉRENTS avec contracts-tab.tsx
+const CONTRACT_STATUS = {
+  envoye: { label: "Envoyé", color: "bg-blue-100 text-blue-800" },
+  signe: { label: "Signé", color: "bg-green-100 text-green-800" },
+  annule: { label: "Annulé", color: "bg-red-100 text-red-800" }
 } as const
 
-type ContractStatus = keyof typeof CONTRACT_STATUS_LABELS
+type ContractStatus = keyof typeof CONTRACT_STATUS
 
+// ✅ INTERFACES DE FORMULAIRES SIMPLIFIÉES
+interface OrganizationFormData {
+  name: string
+  industry: string
+  category: string | undefined
+  region: string | undefined
+  zone_geographique: string
+  district: string
+  city: string
+  address: string
+  secteur: string
+  website: string
+  nb_chambres: string
+  phone: string
+  email: string
+  contact_principal: string
+  contact_fonction: string
+  status: string
+  priority: string
+  notes: string
+}
+
+interface AppointmentFormData {
+  title: string
+  description: string
+  appointment_date: string
+  appointment_time: string
+  location: string
+  type: "Meeting" | "Call" | "Demo" | "Follow-up"
+  status: "Scheduled" | "Completed" | "Cancelled"
+}
+
+interface ContractFormData {
+  description: string
+  status: ContractStatus
+  sentDate: string
+  signatureDate: string
+}
+
+// ✅ COMPOSANT RECODÉ COMPLÈTEMENT
 export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdate }: OrganizationDetailModalProps) {
-  const [notes, setNotes] = useState("")
+  // ============ STATE ============
+  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState("details")
+  
+  // Data
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])
-  const [loading, setLoading] = useState(false)
-  const [showAppointmentForm, setShowAppointmentForm] = useState(false)
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
-  const [showContractForm, setShowContractForm] = useState(false)
-  const [editingContract, setEditingContract] = useState<Contract | null>(null)
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-
-  const [organizationForm, setOrganizationForm] = useState({
+  
+  // Forms
+  const [organizationForm, setOrganizationForm] = useState<OrganizationFormData>({
     name: "",
     industry: "",
-    category: undefined as string | undefined,
-    region: undefined as string | undefined,
+    category: undefined,
+    region: undefined,
     zone_geographique: "",
     district: "",
     city: "",
@@ -60,102 +98,110 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     email: "",
     contact_principal: "",
     contact_fonction: "",
-    status: "Active" as const,
-    priority: "Medium" as const,
-    notes: "", // Ajouté explicitement
+    status: "Active",
+    priority: "Medium",
+    notes: "",
   })
 
-  const [appointmentForm, setAppointmentForm] = useState({
+  const [appointmentForm, setAppointmentForm] = useState<AppointmentFormData>({
     title: "",
     description: "",
     appointment_date: "",
     appointment_time: "",
     location: "",
-    type: "Meeting" as const,
-    status: "Scheduled" as const,
+    type: "Meeting",
+    status: "Scheduled",
   })
 
-  // FORMULAIRE CONTRAT SYNCHRONISÉ avec contracts-tab.tsx
-  const [contractForm, setContractForm] = useState({
+  const [contractForm, setContractForm] = useState<ContractFormData>({
     description: "",
-    status: "envoye" as ContractStatus,
+    status: "envoye",
     sentDate: "",
     signatureDate: "",
   })
 
+  // UI State
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false)
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
+  const [showContractForm, setShowContractForm] = useState(false)
+  const [editingContract, setEditingContract] = useState<Contract | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+
+  // ============ EFFECTS ============
   useEffect(() => {
     if (organization) {
-      setNotes(organization.notes || "")
-      setOrganizationForm({
-        name: organization.name || "",
-        industry: organization.industry || "",
-        category: organization.category && organization.category.trim() ? organization.category : undefined,
-        region: organization.region && organization.region.trim() ? organization.region : undefined,
-        zone_geographique: organization.zone_geographique || "",
-        district: organization.district || "",
-        city: organization.city || "",
-        address: organization.address || "",
-        secteur: organization.secteur || "",
-        website: organization.website || "",
-        nb_chambres: organization.nb_chambres?.toString() || "",
-        phone: organization.phone || "",
-        email: organization.email || "",
-        contact_principal: organization.contact_principal || "",
-        contact_fonction: organization.contact_fonction || "",
-        status: organization.status || "Active",
-        priority: organization.priority || "Medium",
-        notes: organization.notes || "",
-      })
-      loadAppointments()
-      loadContracts()
+      console.log("[ORG_MODAL] Initializing for organization:", organization.id, organization.name)
+      initializeForms()
+      loadRelatedData()
     }
   }, [organization])
 
-  const loadAppointments = async () => {
+  // ============ INITIALIZATION ============
+  const initializeForms = () => {
     if (!organization) return
-    try {
-      const data = await SupabaseClientDB.getAppointmentsByOrganization(organization.id)
-      setAppointments(data)
-    } catch (error) {
-      console.error("Error loading appointments:", error)
-    }
+
+    console.log("[ORG_MODAL] Initializing organization form with data:", organization)
+    
+    setOrganizationForm({
+      name: organization.name || "",
+      industry: organization.industry || "",
+      category: organization.category || undefined,
+      region: organization.region || undefined,
+      zone_geographique: organization.zone_geographique || "",
+      district: organization.district || "",
+      city: organization.city || "",
+      address: organization.address || "",
+      secteur: organization.secteur || "",
+      website: organization.website || "",
+      nb_chambres: organization.nb_chambres?.toString() || "",
+      phone: organization.phone || "",
+      email: organization.email || "",
+      contact_principal: organization.contact_principal || "",
+      contact_fonction: organization.contact_fonction || "",
+      status: organization.status || "Active",
+      priority: organization.priority || "Medium",
+      notes: organization.notes || "",
+    })
   }
 
-  const loadContracts = async () => {
+  const loadRelatedData = async () => {
     if (!organization) return
-    try {
-      const data = await SupabaseClientDB.getContractsByOrganization(organization.id)
-      setContracts(data)
-    } catch (error) {
-      console.error("Error loading contracts:", error)
-    }
-  }
 
-  const handleSaveNotes = async () => {
-    if (!organization) return
-    setLoading(true)
     try {
-      // Mise à jour des notes dans l'état du formulaire aussi
-      setOrganizationForm(prev => ({ ...prev, notes }))
+      console.log("[ORG_MODAL] Loading related data for organization:", organization.id)
       
-      await SupabaseClientDB.updateOrganization(organization.id, { notes })
-      toast.success("Notes sauvegardées avec succès")
-      onUpdate()
+      // Load appointments
+      const appointmentsData = await SupabaseClientDB.getAppointmentsByOrganization(organization.id)
+      console.log("[ORG_MODAL] Appointments loaded:", appointmentsData.length)
+      setAppointments(appointmentsData)
+      
+      // Load contracts
+      const contractsData = await SupabaseClientDB.getContractsByOrganization(organization.id)
+      console.log("[ORG_MODAL] Contracts loaded:", contractsData.length)
+      setContracts(contractsData)
+      
     } catch (error) {
-      console.error("Error saving notes:", error)
-      toast.error("Erreur lors de la sauvegarde des notes")
-    } finally {
-      setLoading(false)
+      console.error("[ORG_MODAL] Error loading related data:", error)
     }
   }
 
-  // FONCTION DE SAUVEGARDE SIMPLIFIÉE ET CORRECTE
+  // ============ ORGANIZATION HANDLERS ============
   const handleSaveOrganization = async () => {
-    if (!organization) return
+    if (!organization) {
+      console.error("[ORG_MODAL] No organization to update")
+      return
+    }
+
+    if (!organizationForm.name.trim()) {
+      toast.error("Le nom de l'organisation est obligatoire")
+      return
+    }
+
     setLoading(true)
+    console.log("[ORG_MODAL] Saving organization:", organization.id, organizationForm.name)
     
     try {
-      // Construction des données mises à jour
+      // ✅ DONNÉES PROPRES POUR LA MISE À JOUR
       const updatedData = {
         name: organizationForm.name.trim(),
         industry: organizationForm.industry.trim() || null,
@@ -167,7 +213,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         address: organizationForm.address.trim() || null,
         secteur: organizationForm.secteur.trim() || null,
         website: organizationForm.website.trim() || null,
-        nb_chambres: organizationForm.nb_chambres ? Number.parseInt(organizationForm.nb_chambres) : null,
+        nb_chambres: organizationForm.nb_chambres ? parseInt(organizationForm.nb_chambres) : null,
         phone: organizationForm.phone.trim() || null,
         email: organizationForm.email.trim() || null,
         contact_principal: organizationForm.contact_principal.trim() || null,
@@ -177,28 +223,65 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         notes: organizationForm.notes.trim() || null,
       }
       
-      // Validation des données obligatoires
-      if (!updatedData.name) {
-        toast.error("Le nom de l'organisation est obligatoire")
-        return
-      }
-      
-      // Mise à jour avec support ID number et string
+      console.log("[ORG_MODAL] Updating with data:", updatedData)
       await SupabaseClientDB.updateOrganization(organization.id, updatedData)
-      toast.success("Organisation mise à jour avec succès")
       
-      // Rechargement des données
+      toast.success("Organisation mise à jour avec succès")
+      console.log("[ORG_MODAL] ✅ Organization updated successfully")
+      
       await onUpdate()
       
     } catch (error) {
-      console.error("Error updating organization:", error)
-      toast.error(`Erreur lors de la mise à jour: ${(error as Error).message}`)
+      console.error("[ORG_MODAL] ❌ Error updating organization:", error)
+      toast.error(`Erreur: ${(error as Error).message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ============ APPOINTMENT HANDLERS ============
+  const handleCreateAppointment = async () => {
+    if (!organization) return
+    if (!appointmentForm.title.trim()) {
+      toast.error("Le titre est obligatoire")
+      return
+    }
+
+    setLoading(true)
+    console.log("[ORG_MODAL] Creating/updating appointment:", appointmentForm)
+    
+    try {
+      const appointmentData = {
+        ...appointmentForm,
+        organization_id: organization.id.toString(),
+        contact_id: null,
+        duration: 60,
+        reminder: true,
+      }
+
+      if (editingAppointment) {
+        await SupabaseClientDB.updateAppointment(editingAppointment.id, appointmentData)
+        toast.success("Rendez-vous modifié avec succès")
+        console.log("[ORG_MODAL] ✅ Appointment updated")
+      } else {
+        await SupabaseClientDB.createAppointment(appointmentData)
+        toast.success("Rendez-vous créé avec succès")
+        console.log("[ORG_MODAL] ✅ Appointment created")
+      }
+
+      resetAppointmentForm()
+      await loadRelatedData()
+      
+    } catch (error) {
+      console.error("[ORG_MODAL] ❌ Error saving appointment:", error)
+      toast.error(`Erreur: ${(error as Error).message}`)
     } finally {
       setLoading(false)
     }
   }
 
   const handleEditAppointment = (appointment: Appointment) => {
+    console.log("[ORG_MODAL] Starting appointment edit:", appointment.id)
     setEditingAppointment(appointment)
     setAppointmentForm({
       title: appointment.title,
@@ -206,8 +289,8 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
       appointment_date: appointment.appointment_date,
       appointment_time: appointment.appointment_time,
       location: appointment.location || "",
-      type: appointment.type,
-      status: appointment.status,
+      type: appointment.type as "Meeting" | "Call" | "Demo" | "Follow-up",
+      status: appointment.status as "Scheduled" | "Completed" | "Cancelled",
     })
     setShowAppointmentForm(true)
   }
@@ -217,59 +300,20 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
 
     setLoading(true)
     try {
+      console.log("[ORG_MODAL] Deleting appointment:", appointmentId)
       await SupabaseClientDB.deleteAppointment(appointmentId)
       toast.success("Rendez-vous supprimé avec succès")
-      loadAppointments()
+      console.log("[ORG_MODAL] ✅ Appointment deleted")
+      await loadRelatedData()
     } catch (error) {
-      console.error("Error deleting appointment:", error)
-      toast.error("Erreur lors de la suppression du rendez-vous")
+      console.error("[ORG_MODAL] ❌ Error deleting appointment:", error)
+      toast.error(`Erreur: ${(error as Error).message}`)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreateAppointment = async () => {
-    if (!organization) return
-    setLoading(true)
-    try {
-      const appointment = {
-        ...appointmentForm,
-        organization_id: organization.id,
-        duration: 60,
-        reminder: true,
-      }
-
-      if (editingAppointment) {
-        await SupabaseClientDB.updateAppointment(editingAppointment.id, appointment)
-        toast.success("Rendez-vous modifié avec succès")
-      } else {
-        await SupabaseClientDB.createAppointment(appointment)
-        toast.success("Rendez-vous créé avec succès")
-      }
-
-      setShowAppointmentForm(false)
-      setEditingAppointment(null)
-      setAppointmentForm({
-        title: "",
-        description: "",
-        appointment_date: "",
-        appointment_time: "",
-        location: "",
-        type: "Meeting",
-        status: "Scheduled",
-      })
-      loadAppointments()
-    } catch (error) {
-      console.error("Error saving appointment:", error)
-      toast.error("Erreur lors de la sauvegarde du rendez-vous")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCancelEdit = () => {
-    setShowAppointmentForm(false)
-    setEditingAppointment(null)
+  const resetAppointmentForm = () => {
     setAppointmentForm({
       title: "",
       description: "",
@@ -279,14 +323,138 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
       type: "Meeting",
       status: "Scheduled",
     })
+    setShowAppointmentForm(false)
+    setEditingAppointment(null)
   }
 
-  // GESTION FICHIERS SYNCHRONISÉE avec contracts-tab.tsx
+  // ============ CONTRACT HANDLERS ============
+  const handleCreateContract = async () => {
+    if (!organization) return
+    
+    setLoading(true)
+    console.log("[ORG_MODAL] Creating/updating contract:", contractForm)
+    
+    try {
+      // ✅ GESTION DES FICHIERS
+      const documents = await Promise.all(
+        selectedFiles.map(async (file) => {
+          let base64Data = (file as any).base64
+
+          if (!base64Data) {
+            base64Data = await new Promise((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result)
+              reader.readAsDataURL(file)
+            })
+          }
+
+          return {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            uploadDate: new Date(),
+            data: base64Data,
+          }
+        }),
+      )
+
+      // ✅ DONNÉES COHÉRENTES EN camelCase
+      const contractInput: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
+        title: `Contrat - ${organization.name}`,
+        description: contractForm.description,
+        organizationId: organization.id.toString(),     // ✅ camelCase
+        contactId: null,
+        value: 0,
+        currency: "EUR",
+        status: contractForm.status,
+        assignedTo: "",                                 // ✅ camelCase
+        expirationDate: undefined,
+        signedDate: contractForm.status === "signe" && contractForm.signatureDate   // ✅ camelCase
+          ? new Date(contractForm.signatureDate) 
+          : undefined,
+        sentDate: contractForm.sentDate ? new Date(contractForm.sentDate) : undefined,  // ✅ camelCase
+        notes: "",
+        documents: documents,
+      }
+
+      if (editingContract) {
+        console.log("[ORG_MODAL] Updating contract:", editingContract.id)
+        await SupabaseClientDB.updateContract(editingContract.id, contractInput)
+        toast.success("Contrat modifié avec succès")
+        console.log("[ORG_MODAL] ✅ Contract updated")
+      } else {
+        console.log("[ORG_MODAL] Creating new contract")
+        await SupabaseClientDB.createContract(contractInput)
+        toast.success("Contrat créé avec succès")
+        console.log("[ORG_MODAL] ✅ Contract created")
+      }
+
+      resetContractForm()
+      await loadRelatedData()
+      
+    } catch (error) {
+      console.error("[ORG_MODAL] ❌ Error saving contract:", error)
+      toast.error(`Erreur: ${(error as Error).message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditContract = (contract: Contract) => {
+    console.log("[ORG_MODAL] Starting contract edit:", contract.id)
+    setEditingContract(contract)
+    
+    // ✅ MAPPING COHÉRENT pour l'édition
+    setContractForm({
+      description: contract.description || "",
+      status: (contract.status as ContractStatus) || "envoye",
+      sentDate: contract.sentDate                    // ✅ cohérent
+        ? new Date(contract.sentDate).toISOString().split("T")[0] 
+        : "",
+      signatureDate: contract.signedDate            // ✅ cohérent
+        ? new Date(contract.signedDate).toISOString().split("T")[0]
+        : "",
+    })
+    
+    setSelectedFiles([])
+    setShowContractForm(true)
+  }
+
+  const handleDeleteContract = async (contractId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce contrat ?")) return
+
+    setLoading(true)
+    try {
+      console.log("[ORG_MODAL] Deleting contract:", contractId)
+      await SupabaseClientDB.deleteContract(contractId)
+      toast.success("Contrat supprimé avec succès")
+      console.log("[ORG_MODAL] ✅ Contract deleted")
+      await loadRelatedData()
+    } catch (error) {
+      console.error("[ORG_MODAL] ❌ Error deleting contract:", error)
+      toast.error(`Erreur: ${(error as Error).message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetContractForm = () => {
+    setContractForm({
+      description: "",
+      status: "envoye",
+      sentDate: "",
+      signatureDate: "",
+    })
+    setSelectedFiles([])
+    setShowContractForm(false)
+    setEditingContract(null)
+  }
+
+  // ============ FILE HANDLERS ============
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
     const fileArray = Array.from(files)
-
     const processedFiles = await Promise.all(
       fileArray.map(async (file) => {
         return new Promise<File>((resolve) => {
@@ -308,109 +476,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const resetContractForm = () => {
-    setContractForm({
-      description: "",
-      status: "envoye",
-      sentDate: "",
-      signatureDate: "",
-    })
-    setSelectedFiles([])
-    setShowContractForm(false)
-    setEditingContract(null)
-  }
-
-  // CRÉATION/MODIFICATION CONTRAT SYNCHRONISÉE avec contracts-tab.tsx
-  const handleCreateContract = async () => {
-    if (!organization) return
-    setLoading(true)
-    try {
-      const documents = await Promise.all(
-        selectedFiles.map(async (file) => {
-          let base64Data = (file as any).base64
-
-          if (!base64Data) {
-            // Convert file to base64 if not already done
-            base64Data = await new Promise((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result)
-              reader.readAsDataURL(file)
-            })
-          }
-
-          return {
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            uploadDate: new Date(),
-            data: base64Data,
-          }
-        }),
-      )
-
-      const contractData: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
-        description: contractForm.description,
-        organization_id: organization.id,
-        contact_id: null,
-        status: contractForm.status,
-        assigned_to: "",
-        notes: "",
-        title: "",
-        value: 0,
-        documents: documents,
-        signed_date: contractForm.status === "signe" && contractForm.signatureDate 
-          ? new Date(contractForm.signatureDate) 
-          : undefined,
-        sent_date: contractForm.sentDate ? new Date(contractForm.sentDate) : undefined,
-      }
-
-      if (editingContract) {
-        await SupabaseClientDB.updateContract(editingContract.id, contractData)
-        toast.success("Contrat modifié avec succès")
-      } else {
-        await SupabaseClientDB.createContract(contractData)
-        toast.success("Contrat créé avec succès")
-      }
-
-      resetContractForm()
-      loadContracts()
-    } catch (error) {
-      console.error("Error saving contract:", error)
-      toast.error("Erreur lors de la sauvegarde du contrat")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleEditContract = (contract: Contract) => {
-    setEditingContract(contract)
-    setContractForm({
-      description: contract.description || "",
-      status: (contract.status as ContractStatus) || "envoye",
-      sentDate: contract.sent_date ? contract.sent_date.toISOString().split("T")[0] : "",
-      signatureDate: contract.signedDate ? contract.signedDate.toISOString().split("T")[0] : "",
-    })
-    setSelectedFiles([])
-    setShowContractForm(true)
-  }
-
-  const handleDeleteContract = async (contractId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce contrat ?")) return
-
-    setLoading(true)
-    try {
-      await SupabaseClientDB.deleteContract(contractId)
-      toast.success("Contrat supprimé avec succès")
-      loadContracts()
-    } catch (error) {
-      console.error("Error deleting contract:", error)
-      toast.error("Erreur lors de la suppression du contrat")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // TÉLÉCHARGEMENT DOCUMENTS SYNCHRONISÉ avec contracts-tab.tsx
   const downloadDocument = (doc: any) => {
     try {
       if (doc.data && doc.data.startsWith("data:")) {
@@ -420,269 +485,274 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-      } else if (doc.url) {
-        const link = document.createElement("a")
-        link.href = doc.url
-        link.download = doc.name
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        console.log("[ORG_MODAL] Document downloaded:", doc.name)
       } else {
         throw new Error("No valid download data found")
       }
     } catch (error) {
-      alert(`Erreur lors du téléchargement de ${doc.name}. Le fichier pourrait ne plus être disponible.`)
+      console.error("[ORG_MODAL] Error downloading document:", error)
+      alert(`Erreur lors du téléchargement de ${doc.name}`)
     }
   }
 
-  // FONCTION COULEUR STATUT SYNCHRONISÉE avec contracts-tab.tsx
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case "signe":
-        return "bg-green-100 text-green-800"
-      case "envoye":
-        return "bg-blue-100 text-blue-800"
-      case "annule":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
+  // ============ RENDER ============
   if (!organization) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">{organization.name}</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-blue-600">
+            {organization.name}
+          </DialogTitle>
           <p className="text-muted-foreground">
-            {organization.industry} • {organization.city}
+            {organization.industry} {organization.city && `• ${organization.city}`}
           </p>
         </DialogHeader>
 
-        <Tabs defaultValue="details" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Détails</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
-            <TabsTrigger value="appointments">Rendez-vous ({appointments.length})</TabsTrigger>
-            <TabsTrigger value="contracts">Contrats ({contracts.length})</TabsTrigger>
+            <TabsTrigger value="appointments" className="relative">
+              Rendez-vous
+              {appointments.length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                  {appointments.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="contracts" className="relative">
+              Contrats
+              {contracts.length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                  {contracts.length}
+                </Badge>
+              )}
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="details" className="space-y-4">
+          {/* ============ ONGLET DÉTAILS ============ */}
+          <TabsContent value="details" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Informations de base */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Informations générales</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Nom de l'organisation *</Label>
+                    <Input
+                      id="name"
+                      value={organizationForm.name}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, name: e.target.value })}
+                      placeholder="Nom de l'organisation"
+                      className="border-2"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="industry">Type/Industrie</Label>
+                    <Input
+                      id="industry"
+                      value={organizationForm.industry}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, industry: e.target.value })}
+                      placeholder="Type d'établissement"
+                    />
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Nom de l'organisation *</Label>
-                <Input
-                  id="name"
-                  value={organizationForm.name}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, name: e.target.value })}
-                  placeholder="Nom de l'organisation"
-                  className="border-2"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="industry">Type/Industrie</Label>
-                <Input
-                  id="industry"
-                  value={organizationForm.industry}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, industry: e.target.value })}
-                  placeholder="Type d'établissement"
-                />
-              </div>
+                  <div>
+                    <Label htmlFor="category">Catégorie (étoiles)</Label>
+                    <Select
+                      value={organizationForm.category}
+                      onValueChange={(value) => setOrganizationForm({ ...organizationForm, category: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une catégorie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1 étoile">1 étoile</SelectItem>
+                        <SelectItem value="2 étoiles">2 étoiles</SelectItem>
+                        <SelectItem value="3 étoiles">3 étoiles</SelectItem>
+                        <SelectItem value="4 étoiles">4 étoiles</SelectItem>
+                        <SelectItem value="5 étoiles">5 étoiles</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="secteur">Secteur</Label>
+                    <Input
+                      id="secteur"
+                      value={organizationForm.secteur}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, secteur: e.target.value })}
+                      placeholder="Secteur d'activité"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="nb_chambres">Nombre de chambres</Label>
+                    <Input
+                      id="nb_chambres"
+                      type="number"
+                      value={organizationForm.nb_chambres}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, nb_chambres: e.target.value })}
+                      placeholder="Nombre de chambres"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Localisation */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Localisation</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="region">Région</Label>
+                    <Select
+                      value={organizationForm.region}
+                      onValueChange={(value) => setOrganizationForm({ ...organizationForm, region: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une région" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Nord">Nord</SelectItem>
+                        <SelectItem value="Sud">Sud</SelectItem>
+                        <SelectItem value="Est">Est</SelectItem>
+                        <SelectItem value="Ouest">Ouest</SelectItem>
+                        <SelectItem value="Centre">Centre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="district">District</Label>
+                    <Input
+                      id="district"
+                      value={organizationForm.district}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, district: e.target.value })}
+                      placeholder="District"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="zone_geographique">Zone géographique</Label>
+                    <Input
+                      id="zone_geographique"
+                      value={organizationForm.zone_geographique}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, zone_geographique: e.target.value })}
+                      placeholder="Zone géographique"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="city">Ville</Label>
+                    <Input
+                      id="city"
+                      value={organizationForm.city}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, city: e.target.value })}
+                      placeholder="Ville"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="address">Adresse précise</Label>
+                    <Input
+                      id="address"
+                      value={organizationForm.address}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, address: e.target.value })}
+                      placeholder="Adresse complète"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="category">Catégorie (étoiles)</Label>
-                <Select
-                  value={organizationForm.category}
-                  onValueChange={(value) => setOrganizationForm({ ...organizationForm, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une catégorie" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1 étoile">1 étoile</SelectItem>
-                    <SelectItem value="2 étoiles">2 étoiles</SelectItem>
-                    <SelectItem value="3 étoiles">3 étoiles</SelectItem>
-                    <SelectItem value="4 étoiles">4 étoiles</SelectItem>
-                    <SelectItem value="5 étoiles">5 étoiles</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="secteur">Secteur</Label>
-                <Input
-                  id="secteur"
-                  value={organizationForm.secteur}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, secteur: e.target.value })}
-                  placeholder="Secteur d'activité"
-                />
-              </div>
-              <div>
-                <Label htmlFor="nb_chambres">Nombre de chambres</Label>
-                <Input
-                  id="nb_chambres"
-                  type="number"
-                  value={organizationForm.nb_chambres}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, nb_chambres: e.target.value })}
-                  placeholder="Nombre de chambres"
-                />
-              </div>
-            </div>
+            {/* Contact et statut */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Contact et statut</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="phone">Téléphone</Label>
+                    <Input
+                      id="phone"
+                      value={organizationForm.phone}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, phone: e.target.value })}
+                      placeholder="Numéro de téléphone"
+                    />
+                  </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="region">Région</Label>
-                <Select
-                  value={organizationForm.region}
-                  onValueChange={(value) => setOrganizationForm({ ...organizationForm, region: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une région" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Nord">Nord</SelectItem>
-                    <SelectItem value="Sud">Sud</SelectItem>
-                    <SelectItem value="Est">Est</SelectItem>
-                    <SelectItem value="Ouest">Ouest</SelectItem>
-                    <SelectItem value="Centre">Centre</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="district">District</Label>
-                <Input
-                  id="district"
-                  value={organizationForm.district}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, district: e.target.value })}
-                  placeholder="District"
-                />
-              </div>
-              <div>
-                <Label htmlFor="zone_geographique">Zone géographique</Label>
-                <Input
-                  id="zone_geographique"
-                  value={organizationForm.zone_geographique}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, zone_geographique: e.target.value })}
-                  placeholder="Zone géographique"
-                />
-              </div>
-            </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={organizationForm.email}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, email: e.target.value })}
+                      placeholder="Adresse email"
+                    />
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="city">Ville</Label>
-                <Input
-                  id="city"
-                  value={organizationForm.city}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, city: e.target.value })}
-                  placeholder="Ville"
-                />
-              </div>
-              <div>
-                <Label htmlFor="address">Adresse précise</Label>
-                <Input
-                  id="address"
-                  value={organizationForm.address}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, address: e.target.value })}
-                  placeholder="Adresse complète"
-                />
-              </div>
-            </div>
+                  <div>
+                    <Label htmlFor="website">Site web</Label>
+                    <Input
+                      id="website"
+                      value={organizationForm.website}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, website: e.target.value })}
+                      placeholder="https://www.example.com"
+                    />
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="phone">Téléphone</Label>
-                <Input
-                  id="phone"
-                  value={organizationForm.phone}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, phone: e.target.value })}
-                  placeholder="Numéro de téléphone"
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={organizationForm.email}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, email: e.target.value })}
-                  placeholder="Adresse email"
-                />
-              </div>
-            </div>
+                  <div>
+                    <Label htmlFor="contact_principal">Contact principal</Label>
+                    <Input
+                      id="contact_principal"
+                      value={organizationForm.contact_principal}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, contact_principal: e.target.value })}
+                      placeholder="Nom du contact"
+                    />
+                  </div>
 
-            <div>
-              <Label htmlFor="website">Site web officiel</Label>
-              <Input
-                id="website"
-                value={organizationForm.website}
-                onChange={(e) => setOrganizationForm({ ...organizationForm, website: e.target.value })}
-                placeholder="https://www.example.com"
-              />
-            </div>
+                  <div>
+                    <Label htmlFor="contact_fonction">Fonction</Label>
+                    <Input
+                      id="contact_fonction"
+                      value={organizationForm.contact_fonction}
+                      onChange={(e) => setOrganizationForm({ ...organizationForm, contact_fonction: e.target.value })}
+                      placeholder="Fonction/Poste"
+                    />
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="contact_principal">Contact principal</Label>
-                <Input
-                  id="contact_principal"
-                  value={organizationForm.contact_principal}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, contact_principal: e.target.value })}
-                  placeholder="Nom du contact principal"
-                />
-              </div>
-              <div>
-                <Label htmlFor="contact_fonction">Fonction du contact</Label>
-                <Input
-                  id="contact_fonction"
-                  value={organizationForm.contact_fonction}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, contact_fonction: e.target.value })}
-                  placeholder="Fonction/Poste"
-                />
-              </div>
-            </div>
+                  <div>
+                    <Label htmlFor="status">Statut</Label>
+                    <Select
+                      value={organizationForm.status}
+                      onValueChange={(value) => setOrganizationForm({ ...organizationForm, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Active">Actif</SelectItem>
+                        <SelectItem value="Inactive">Inactif</SelectItem>
+                        <SelectItem value="Prospect">Prospect</SelectItem>
+                        <SelectItem value="Client">Client</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="status">Statut</Label>
-                <Select
-                  value={organizationForm.status}
-                  onValueChange={(value: any) => setOrganizationForm({ ...organizationForm, status: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Active">Actif</SelectItem>
-                    <SelectItem value="Inactive">Inactif</SelectItem>
-                    <SelectItem value="Prospect">Prospect</SelectItem>
-                    <SelectItem value="Client">Client</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="priority">Priorité</Label>
-                <Select
-                  value={organizationForm.priority}
-                  onValueChange={(value: any) => setOrganizationForm({ ...organizationForm, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Faible</SelectItem>
-                    <SelectItem value="Medium">Moyenne</SelectItem>
-                    <SelectItem value="High">Élevée</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
+            {/* Bouton de sauvegarde */}
             <Button 
               onClick={handleSaveOrganization} 
               disabled={loading || !organizationForm.name.trim()} 
@@ -694,58 +764,71 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
             </Button>
           </TabsContent>
 
-          <TabsContent value="notes" className="space-y-4">
-            <div className="space-y-4">
-              <Label htmlFor="notes">Notes et commentaires</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ajoutez vos notes sur cette organisation..."
-                className="min-h-[200px]"
-              />
-              <Button onClick={handleSaveNotes} disabled={loading} className="w-full">
-                <Save className="w-4 h-4 mr-2" />
-                {loading ? "Sauvegarde..." : "Sauvegarder les notes"}
-              </Button>
-            </div>
+          {/* ============ ONGLET NOTES ============ */}
+          <TabsContent value="notes" className="space-y-4 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notes et commentaires</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={organizationForm.notes}
+                  onChange={(e) => setOrganizationForm({ ...organizationForm, notes: e.target.value })}
+                  placeholder="Ajoutez vos notes sur cette organisation..."
+                  className="min-h-[300px] resize-none"
+                />
+                <Button 
+                  onClick={handleSaveOrganization} 
+                  disabled={loading}
+                  className="w-full mt-4"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {loading ? "Sauvegarde..." : "Sauvegarder les notes"}
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="appointments" className="space-y-4">
+          {/* ============ ONGLET RENDEZ-VOUS ============ */}
+          <TabsContent value="appointments" className="space-y-4 mt-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Rendez-vous</h3>
+              <h3 className="text-lg font-semibold">Rendez-vous ({appointments.length})</h3>
               <Button onClick={() => setShowAppointmentForm(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Nouveau RDV
               </Button>
             </div>
 
+            {/* Formulaire RDV */}
             {showAppointmentForm && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     {editingAppointment ? "Modifier le rendez-vous" : "Nouveau rendez-vous"}
-                    <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                    <Button variant="ghost" size="sm" onClick={resetAppointmentForm}>
                       <X className="w-4 h-4" />
                     </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="title">Titre</Label>
+                      <Label htmlFor="apt-title">Titre *</Label>
                       <Input
-                        id="title"
+                        id="apt-title"
                         value={appointmentForm.title}
                         onChange={(e) => setAppointmentForm({ ...appointmentForm, title: e.target.value })}
                         placeholder="Titre du rendez-vous"
+                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="type">Type</Label>
+                      <Label htmlFor="apt-type">Type</Label>
                       <Select
                         value={appointmentForm.type}
-                        onValueChange={(value: any) => setAppointmentForm({ ...appointmentForm, type: value })}
+                        onValueChange={(value: AppointmentFormData["type"]) => 
+                          setAppointmentForm({ ...appointmentForm, type: value })
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -760,20 +843,20 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="date">Date</Label>
+                      <Label htmlFor="apt-date">Date</Label>
                       <Input
-                        id="date"
+                        id="apt-date"
                         type="date"
                         value={appointmentForm.appointment_date}
                         onChange={(e) => setAppointmentForm({ ...appointmentForm, appointment_date: e.target.value })}
                       />
                     </div>
                     <div>
-                      <Label htmlFor="time">Heure</Label>
+                      <Label htmlFor="apt-time">Heure</Label>
                       <Input
-                        id="time"
+                        id="apt-time"
                         type="time"
                         value={appointmentForm.appointment_time}
                         onChange={(e) => setAppointmentForm({ ...appointmentForm, appointment_time: e.target.value })}
@@ -782,9 +865,9 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                   </div>
 
                   <div>
-                    <Label htmlFor="location">Lieu</Label>
+                    <Label htmlFor="apt-location">Lieu</Label>
                     <Input
-                      id="location"
+                      id="apt-location"
                       value={appointmentForm.location}
                       onChange={(e) => setAppointmentForm({ ...appointmentForm, location: e.target.value })}
                       placeholder="Lieu du rendez-vous"
@@ -792,84 +875,114 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                   </div>
 
                   <div>
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="apt-description">Description</Label>
                     <Textarea
-                      id="description"
+                      id="apt-description"
                       value={appointmentForm.description}
                       onChange={(e) => setAppointmentForm({ ...appointmentForm, description: e.target.value })}
                       placeholder="Description du rendez-vous"
+                      rows={3}
                     />
                   </div>
 
-                  <Button onClick={handleCreateAppointment} disabled={loading}>
-                    <Save className="w-4 h-4 mr-2" />
-                    {loading
-                      ? "Sauvegarde..."
-                      : editingAppointment
-                        ? "Modifier le rendez-vous"
-                        : "Créer le rendez-vous"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button onClick={handleCreateAppointment} disabled={loading}>
+                      <Save className="w-4 h-4 mr-2" />
+                      {loading ? "Sauvegarde..." : editingAppointment ? "Modifier" : "Créer"}
+                    </Button>
+                    <Button variant="outline" onClick={resetAppointmentForm}>
+                      Annuler
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
 
-            <div className="space-y-4">
-              {appointments.map((appointment) => (
-                <Card key={appointment.id}>
-                  <CardContent className="pt-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-semibold">{appointment.title}</h4>
-                        <p className="text-sm text-muted-foreground">{appointment.description}</p>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            {appointment.appointment_date}
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="w-4 h-4 mr-1" />
-                            {appointment.appointment_time}
-                          </div>
-                          {appointment.location && (
-                            <div className="flex items-center">
-                              <MapPin className="w-4 h-4 mr-1" />
-                              {appointment.location}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{appointment.status}</Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditAppointment(appointment)}
-                          disabled={loading}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAppointment(appointment.id)}
-                          disabled={loading}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+            {/* Liste des RDV */}
+            <div className="space-y-3">
+              {appointments.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6 text-center text-gray-500">
+                    <Calendar className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                    <p>Aucun rendez-vous planifié</p>
+                    <p className="text-sm">Créez votre premier rendez-vous avec cette organisation.</p>
                   </CardContent>
                 </Card>
-              ))}
-
-              {appointments.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">Aucun rendez-vous planifié</div>
+              ) : (
+                appointments.map((appointment) => (
+                  <Card key={appointment.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="pt-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold">{appointment.title}</h4>
+                            <Badge variant="outline" className="text-xs">
+                              {appointment.type}
+                            </Badge>
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                appointment.status === 'Completed' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : appointment.status === 'Cancelled'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}
+                            >
+                              {appointment.status}
+                            </Badge>
+                          </div>
+                          
+                          {appointment.description && (
+                            <p className="text-sm text-muted-foreground mb-2">{appointment.description}</p>
+                          )}
+                          
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 mr-1" />
+                              {new Date(appointment.appointment_date).toLocaleDateString("fr-FR")}
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="w-4 h-4 mr-1" />
+                              {appointment.appointment_time}
+                            </div>
+                            {appointment.location && (
+                              <div className="flex items-center">
+                                <MapPin className="w-4 h-4 mr-1" />
+                                {appointment.location}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditAppointment(appointment)}
+                            disabled={loading}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteAppointment(appointment.id)}
+                            disabled={loading}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
               )}
             </div>
           </TabsContent>
 
-          {/* ONGLET CONTRATS COMPLÈTEMENT SYNCHRONISÉ avec contracts-tab.tsx */}
-          <TabsContent value="contracts" className="space-y-4">
+          {/* ============ ONGLET CONTRATS ============ */}
+          <TabsContent value="contracts" className="space-y-4 mt-6">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Contrats ({contracts.length})</h3>
               <Button onClick={() => setShowContractForm(true)}>
@@ -878,6 +991,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
               </Button>
             </div>
 
+            {/* Formulaire Contrat */}
             {showContractForm && (
               <Card>
                 <CardHeader>
@@ -889,7 +1003,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="contract-status">Statut</Label>
                       <Select
@@ -906,10 +1020,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                         </SelectContent>
                       </Select>
                     </div>
-                    <div></div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="sent-date">Date d'envoi</Label>
                       <Input
@@ -958,6 +1068,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                         </Button>
                       </div>
 
+                      {/* Fichiers sélectionnés */}
                       {selectedFiles.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-sm font-medium">Fichiers sélectionnés :</p>
@@ -976,6 +1087,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                         </div>
                       )}
 
+                      {/* Documents existants */}
                       {editingContract && editingContract.documents && editingContract.documents.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-sm font-medium">Documents existants :</p>
@@ -999,40 +1111,50 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                     </div>
                   </div>
 
-                  <Button onClick={handleCreateContract} disabled={loading}>
-                    <Save className="w-4 h-4 mr-2" />
-                    {loading ? "Sauvegarde..." : editingContract ? "Modifier le contrat" : "Créer le contrat"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button onClick={handleCreateContract} disabled={loading}>
+                      <Save className="w-4 h-4 mr-2" />
+                      {loading ? "Sauvegarde..." : editingContract ? "Modifier" : "Créer"}
+                    </Button>
+                    <Button variant="outline" onClick={resetContractForm}>
+                      Annuler
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
 
-            <div className="space-y-4">
-              {contracts.map((contract) => {
-                const organizationId = (contract as any).organization_id || contract.organizationId
-                
-                return (
-                  <Card key={contract.id}>
+            {/* Liste des Contrats */}
+            <div className="space-y-3">
+              {contracts.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6 text-center text-gray-500">
+                    <FileText className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                    <p>Aucun contrat enregistré</p>
+                    <p className="text-sm">Créez votre premier contrat avec cette organisation.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                contracts.map((contract) => (
+                  <Card key={contract.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="pt-4">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
-                            <Badge className={getStatusBadgeColor(contract.status)}>
-                              {CONTRACT_STATUS_LABELS[contract.status as ContractStatus] || contract.status}
+                            <Badge className={CONTRACT_STATUS[contract.status as ContractStatus]?.color || "bg-gray-100 text-gray-800"}>
+                              {CONTRACT_STATUS[contract.status as ContractStatus]?.label || contract.status}
                             </Badge>
+                            {contract.title && (
+                              <span className="text-lg font-semibold">{contract.title}</span>
+                            )}
                           </div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              <span className="text-blue-700 font-medium">
-                                Organisation: {organization.name}
-                              </span>
-                            </div>
-                            {contract.sent_date && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground mb-2">
+                            {/* ✅ AFFICHAGE COHÉRENT DES DATES */}
+                            {contract.sentDate && (
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4" />
-                                <span>Envoyé le: {new Date(contract.sent_date).toLocaleDateString("fr-FR")}</span>
+                                <span>Envoyé le: {new Date(contract.sentDate).toLocaleDateString("fr-FR")}</span>
                               </div>
                             )}
                             {contract.signedDate && (
@@ -1043,8 +1165,11 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                             )}
                           </div>
 
-                          {contract.description && <p className="mt-2 text-sm text-gray-700">{contract.description}</p>}
+                          {contract.description && (
+                            <p className="text-sm text-gray-700 mb-3">{contract.description}</p>
+                          )}
 
+                          {/* Documents */}
                           {contract.documents && contract.documents.length > 0 && (
                             <div className="mt-3 p-3 bg-gray-50 rounded">
                               <p className="text-sm font-medium mb-2">Documents ({contract.documents.length}) :</p>
@@ -1096,11 +1221,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                       </div>
                     </CardContent>
                   </Card>
-                )
-              })}
-
-              {contracts.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">Aucun contrat enregistré</div>
+                ))
               )}
             </div>
           </TabsContent>
