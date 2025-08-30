@@ -27,6 +27,7 @@ import type { Organization, ImportResult } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
 import { ImportModal } from "./import-modal"
 import { OrganizationDetailModal } from "./organization-detail-modal"
+import { CreateOrganizationModal } from "./create-organization-modal"
 
 function SupabaseDiagnostic() {
   const [connectionStatus, setConnectionStatus] = useState<string>("Checking...")
@@ -138,6 +139,7 @@ export function Organizations() {
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showDiagnostic, setShowDiagnostic] = useState(false)
@@ -222,6 +224,18 @@ export function Organizations() {
       setOrganizations([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateOrganization = async (orgData: Omit<Organization, "id" | "created_at" | "updated_at">) => {
+    try {
+      await SupabaseClientDB.createOrganization(orgData)
+      await loadData()
+      setShowCreateModal(false)
+      console.log("[v0] Organisation créée avec succès")
+    } catch (error) {
+      console.error("Erreur lors de la création de l'organisation:", error)
+      alert("Erreur lors de la création de l'organisation")
     }
   }
 
@@ -467,7 +481,10 @@ export function Organizations() {
             <Upload className="w-4 h-4 mr-2" />
             Import CSV/Excel
           </Button>
-          <Button className="bg-primary hover:bg-primary/90">
+          <Button 
+            className="bg-primary hover:bg-primary/90"
+            onClick={() => setShowCreateModal(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Ajouter Organisation
           </Button>
@@ -856,14 +873,16 @@ export function Organizations() {
       {filteredOrganizations.length === 0 && (
         <div className="text-center py-12">
           <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          {/* Changed subtitle color to blue */}
           <h3 className="text-lg font-semibold text-blue-600 mb-2">Aucune organisation trouvée</h3>
           <p className="text-muted-foreground mb-4">
             {searchTerm || Object.values(filters).some(Boolean)
               ? "Essayez d'ajuster vos termes de recherche ou filtres"
               : "Commencez par ajouter votre première organisation"}
           </p>
-          <Button className="bg-primary hover:bg-primary/90">
+          <Button 
+            className="bg-primary hover:bg-primary/90"
+            onClick={() => setShowCreateModal(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Ajouter Organisation
           </Button>
@@ -875,6 +894,12 @@ export function Organizations() {
         onClose={() => setShowImportModal(false)}
         onImport={handleImportOrganizations}
         type="organizations"
+      />
+
+      <CreateOrganizationModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateOrganization}
       />
 
       <OrganizationDetailModal
