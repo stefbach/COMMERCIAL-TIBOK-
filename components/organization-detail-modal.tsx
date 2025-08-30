@@ -85,8 +85,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
 
   useEffect(() => {
     if (organization) {
-      console.log("[DEBUG] Loading organization data:", organization)
-      
       setNotes(organization.notes || "")
       setOrganizationForm({
         name: organization.name || "",
@@ -157,8 +155,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     setLoading(true)
     
     try {
-      console.log("[DEBUG] Saving organization with form data:", organizationForm)
-      
       // Construction des données mises à jour avec mappage correct des champs
       const updatedData = {
         name: organizationForm.name.trim(),
@@ -183,16 +179,13 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         updated_at: new Date().toISOString(),
       }
       
-      console.log("[DEBUG] Data to be saved:", updatedData)
-      
       // Validation des données obligatoires
       if (!updatedData.name) {
         toast.error("Le nom de l'organisation est obligatoire")
         return
       }
       
-      const result = await SupabaseClientDB.updateOrganization(organization.id, updatedData)
-      console.log("[DEBUG] Update result:", result)
+      await SupabaseClientDB.updateOrganization(organization.id, updatedData)
       
       toast.success("Organisation mise à jour avec succès")
       
@@ -200,7 +193,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
       await onUpdate()
       
     } catch (error) {
-      console.error("Error updating organization:", error)
       toast.error(`Erreur lors de la mise à jour: ${(error as Error).message}`)
     } finally {
       setLoading(false)
@@ -429,7 +421,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        console.log("[v0] Document downloaded:", doc.name)
       } else if (doc.url) {
         const link = document.createElement("a")
         link.href = doc.url
@@ -437,12 +428,10 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        console.log("[v0] Document downloaded (fallback):", doc.name)
       } else {
         throw new Error("No valid download data found")
       }
     } catch (error) {
-      console.error("[v0] Error downloading document:", error)
       alert(`Erreur lors du téléchargement de ${doc.name}. Le fichier pourrait ne plus être disponible.`)
     }
   }
@@ -482,16 +471,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
-            {/* DEBUG INFO - Supprimer en production */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="p-3 bg-gray-100 rounded text-xs">
-                <strong>DEBUG:</strong> Organization ID: {organization.id}
-                <br />
-                Form name: {organizationForm.name}
-                <br />
-                Original name: {organization.name}
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -499,10 +478,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                 <Input
                   id="name"
                   value={organizationForm.name}
-                  onChange={(e) => {
-                    console.log("[DEBUG] Name changed to:", e.target.value)
-                    setOrganizationForm({ ...organizationForm, name: e.target.value })
-                  }}
+                  onChange={(e) => setOrganizationForm({ ...organizationForm, name: e.target.value })}
                   placeholder="Nom de l'organisation"
                   className="border-2"
                   required
@@ -1053,7 +1029,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4" />
                               <span className="text-blue-700 font-medium">
-                                Organisation: {organization?.name}
+                                Organisation: {organization.name}
                               </span>
                             </div>
                             {contract.sent_date && (
