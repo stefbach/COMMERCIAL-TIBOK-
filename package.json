@@ -1,6 +1,6 @@
 {
   "name": "crm-universe-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Application CRM complète avec gestion des organisations, contacts, rendez-vous et contrats",
   "keywords": [
