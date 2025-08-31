@@ -11,6 +11,23 @@ export interface Profile {
   updated_at: string
 }
 
+export interface CRMDocument {
+  id: string
+  title: string
+  description?: string
+  file_name: string
+  file_path: string
+  file_size: number
+  mime_type: string
+  category: 'presentation_commerciale' | 'contrat'
+  sub_category?: string
+  version: number
+  is_active: boolean
+  uploaded_by: string
+  created_at: string
+  updated_at: string
+}
+
 // Client-side database operations
 export class SupabaseClientDB {
   private static getClient() {
@@ -877,6 +894,282 @@ export class SupabaseClientDB {
     return data || []
   }
 
+  // CRM Documents
+  static async getCRMDocuments(): Promise<CRMDocument[]> {
+    console.log("[v0] Loading CRM documents...")
+
+    if (await this.isDemoMode()) {
+      console.log("[v0] Using demo mode for CRM documents")
+      const demoDocuments = this.getDemoData("crm_documents")
+      console.log("[v0] Demo CRM documents loaded:", demoDocuments.length)
+      return demoDocuments
+    }
+
+    try {
+      console.log("[v0] Using Supabase for CRM documents")
+      const supabase = this.getClient()
+      const { data, error } = await supabase
+        .from("crm_documents")
+        .select("*")
+        .eq("is_active", true)
+        .order("updated_at", { ascending: false })
+
+      if (error) {
+        console.log("[v0] Supabase error, falling back to demo mode:", error.message)
+        const demoDocuments = this.getDemoData("crm_documents")
+        console.log("[v0] Fallback CRM documents loaded:", demoDocuments.length)
+        return demoDocuments
+      }
+
+      console.log("[v0] Supabase CRM documents loaded:", data?.length || 0)
+      return data || []
+    } catch (error) {
+      console.log("[v0] Supabase failed, falling back to demo mode:", error)
+      const demoDocuments = this.getDemoData("crm_documents")
+      console.log("[v0] Fallback CRM documents loaded:", demoDocuments.length)
+      return demoDocuments
+    }
+  }
+
+  static async createCRMDocument(docData: Omit<CRMDocument, "id" | "created_at" | "updated_at">): Promise<CRMDocument> {
+    console.log("[v0] Creating CRM document:", docData.title)
+
+    if (await this.isDemoMode()) {
+      console.log("[v0] Using demo mode for CRM document creation")
+      const newDoc: CRMDocument = {
+        id: this.generateId(),
+        ...docData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      const documents = this.getDemoData("crm_documents")
+      documents.unshift(newDoc)
+      this.setDemoData("crm_documents", documents)
+      return newDoc
+    }
+
+    try {
+      console.log("[v0] Using Supabase for CRM document creation")
+      const supabase = this.getClient()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("User not authenticated")
+
+      const supabaseData = {
+        ...docData,
+        uploaded_by: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase
+        .from("crm_documents")
+        .insert([supabaseData])
+        .select()
+        .single()
+
+      if (error) {
+        console.log("[v0] Supabase insert failed:", error.message)
+        throw error
+      }
+
+      console.log("[v0] CRM Document successfully created in Supabase")
+      return data
+    } catch (error) {
+      console.log("[v0] Supabase creation failed:", error)
+      throw error
+    }
+  }
+
+  static async updateCRMDocument(id: string, updates: Partial<CRMDocument>): Promise<CRMDocument> {
+    console.log("[v0] Updating CRM document:", id)
+
+    if (await this.isDemoMode()) {
+      console.log("[v0] Using demo mode for CRM document update")
+      const documents = this.getDemoData("crm_documents")
+      const index = documents.findIndex((doc: CRMDocument) => doc.id === id)
+      if (index !== -1) {
+        documents[index] = { 
+          ...documents[index], 
+          ...updates, 
+          updated_at: new Date().toISOString() 
+        }
+        this.setDemoData("crm_documents", documents)
+        return documents[index]
+      }
+      throw new Error("CRM Document not found")
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase
+        .from("crm_documents")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single()
+
+      if (error) throw error
+      console.log("[v0] CRM Document updated successfully")
+      return data
+    } catch (error) {
+      console.error("[v0] Supabase update failed:", error)
+      throw error
+    }
+  }
+
+  static async deleteCRMDocument(id: string): Promise<void> {
+    console.log("[v0] Deleting CRM document:", id)
+
+    if (await this.isDemoMode()) {
+      console.log("[v0] Using demo mode for CRM document deletion")
+      const documents = this.getDemoData("crm_documents")
+      const updatedDocuments = documents.map((doc: CRMDocument) => 
+        doc.id === id ? { ...doc, is_active: false } : doc
+      )
+      this.setDemoData("crm_documents", updatedDocuments)
+      return
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { error } = await supabase
+        .from("crm_documents")
+        .update({ is_active: false })
+        .eq("id", id)
+
+      if (error) throw error
+      console.log("[v0] CRM Document deleted successfully")
+    } catch (error) {
+      console.error("[v0] Supabase deletion failed:", error)
+      throw error
+    }
+  }
+
+  static async getCRMDocumentsByCategory(category: 'presentation_commerciale' | 'contrat'): Promise<CRMDocument[]> {
+    console.log("[v0] Loading CRM documents by category:", category)
+
+    if (await this.isDemoMode()) {
+      const documents = this.getDemoData("crm_documents")
+      return documents.filter((doc: CRMDocument) => doc.category === category && doc.is_active)
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase
+        .from("crm_documents")
+        .select("*")
+        .eq("category", category)
+        .eq("is_active", true)
+        .order("updated_at", { ascending: false })
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error("[v0] Error loading CRM documents by category:", error)
+      const documents = this.getDemoData("crm_documents")
+      return documents.filter((doc: CRMDocument) => doc.category === category && doc.is_active)
+    }
+  }
+
+  static async getCRMDocumentsBySubCategory(subCategory: string): Promise<CRMDocument[]> {
+    console.log("[v0] Loading CRM documents by sub-category:", subCategory)
+
+    if (await this.isDemoMode()) {
+      const documents = this.getDemoData("crm_documents")
+      return documents.filter((doc: CRMDocument) => doc.sub_category === subCategory && doc.is_active)
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase
+        .from("crm_documents")
+        .select("*")
+        .eq("sub_category", subCategory)
+        .eq("is_active", true)
+        .order("updated_at", { ascending: false })
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error("[v0] Error loading CRM documents by sub-category:", error)
+      const documents = this.getDemoData("crm_documents")
+      return documents.filter((doc: CRMDocument) => doc.sub_category === subCategory && doc.is_active)
+    }
+  }
+
+  // Gestion des fichiers avec Supabase Storage
+  static async uploadCRMDocumentFile(file: File, fileName: string): Promise<string> {
+    console.log("[v0] Uploading CRM document file:", fileName)
+
+    if (await this.isDemoMode()) {
+      console.log("[v0] Demo mode - file upload simulated")
+      return `demo/${fileName}`
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase.storage
+        .from('crm-documents')
+        .upload(fileName, file)
+
+      if (error) throw error
+      
+      console.log("[v0] File uploaded successfully:", data.path)
+      return data.path
+    } catch (error) {
+      console.error("[v0] File upload failed:", error)
+      throw error
+    }
+  }
+
+  static async downloadCRMDocumentFile(filePath: string): Promise<Blob> {
+    console.log("[v0] Downloading CRM document file:", filePath)
+
+    if (await this.isDemoMode()) {
+      console.log("[v0] Demo mode - file download simulated")
+      throw new Error("File download not available in demo mode")
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase.storage
+        .from('crm-documents')
+        .download(filePath)
+
+      if (error) throw error
+      
+      console.log("[v0] File downloaded successfully")
+      return data
+    } catch (error) {
+      console.error("[v0] File download failed:", error)
+      throw error
+    }
+  }
+
+  static async deleteCRMDocumentFile(filePath: string): Promise<void> {
+    console.log("[v0] Deleting CRM document file:", filePath)
+
+    if (await this.isDemoMode()) {
+      console.log("[v0] Demo mode - file deletion simulated")
+      return
+    }
+
+    try {
+      const supabase = this.getClient()
+      const { error } = await supabase.storage
+        .from('crm-documents')
+        .remove([filePath])
+
+      if (error) throw error
+      
+      console.log("[v0] File deleted successfully")
+    } catch (error) {
+      console.error("[v0] File deletion failed:", error)
+      throw error
+    }
+  }
+
   // User Management
   static async getAdmins(): Promise<any[]> {
     if (await this.isDemoMode()) {
@@ -1215,6 +1508,135 @@ export class SupabaseClientDB {
           },
         ]
 
+      case "crm_documents":
+        return [
+          {
+            id: "doc_001",
+            title: "Présentation Télémédecine Globale",
+            description: "Vue d'ensemble de la télémédecine dans le monde - Statistiques et tendances 2024",
+            file_name: "telemedecine_monde_2024.pdf",
+            file_path: "demo/telemedecine_monde_2024.pdf",
+            file_size: 2850000,
+            mime_type: "application/pdf",
+            category: "presentation_commerciale",
+            sub_category: "telemedecine_monde",
+            version: 1,
+            is_active: true,
+            uploaded_by: "demo-user",
+            created_at: "2024-01-15T10:00:00Z",
+            updated_at: "2024-01-15T10:00:00Z"
+          },
+          {
+            id: "doc_002",
+            title: "Solution CRM pour Hôtels de Luxe",
+            description: "Présentation commerciale adaptée au secteur hôtelier premium",
+            file_name: "crm_hotels_luxe.pdf",
+            file_path: "demo/crm_hotels_luxe.pdf",
+            file_size: 1950000,
+            mime_type: "application/pdf",
+            category: "presentation_commerciale",
+            sub_category: "hotel",
+            version: 2,
+            is_active: true,
+            uploaded_by: "demo-user",
+            created_at: "2024-01-20T14:30:00Z",
+            updated_at: "2024-02-15T09:20:00Z"
+          },
+          {
+            id: "doc_003",
+            title: "CRM pour Pharmacies - Présentation",
+            description: "Solution spécialisée pour la gestion des pharmacies",
+            file_name: "crm_pharmacies.pdf",
+            file_path: "demo/crm_pharmacies.pdf",
+            file_size: 1650000,
+            mime_type: "application/pdf",
+            category: "presentation_commerciale",
+            sub_category: "pharmacie",
+            version: 1,
+            is_active: true,
+            uploaded_by: "demo-user",
+            created_at: "2024-02-01T11:15:00Z",
+            updated_at: "2024-02-01T11:15:00Z"
+          },
+          {
+            id: "doc_004",
+            title: "Solutions Entreprise B2B",
+            description: "Présentation des solutions CRM pour les entreprises",
+            file_name: "crm_entreprises.pdf",
+            file_path: "demo/crm_entreprises.pdf",
+            file_size: 2100000,
+            mime_type: "application/pdf",
+            category: "presentation_commerciale",
+            sub_category: "entreprise",
+            version: 1,
+            is_active: true,
+            uploaded_by: "demo-user",
+            created_at: "2024-02-10T16:45:00Z",
+            updated_at: "2024-02-10T16:45:00Z"
+          },
+          {
+            id: "doc_005",
+            title: "CRM Maisons de Retraite",
+            description: "Solution adaptée aux établissements pour seniors",
+            file_name: "crm_maisons_retraite.pdf",
+            file_path: "demo/crm_maisons_retraite.pdf",
+            file_size: 1750000,
+            mime_type: "application/pdf",
+            category: "presentation_commerciale",
+            sub_category: "maison_retraite",
+            version: 1,
+            is_active: true,
+            uploaded_by: "demo-user",
+            created_at: "2024-02-05T13:20:00Z",
+            updated_at: "2024-02-05T13:20:00Z"
+          },
+          {
+            id: "doc_006",
+            title: "Contrat Standard CRM Premium",
+            description: "Modèle de contrat pour solutions CRM premium",
+            file_name: "contrat_crm_premium.docx",
+            file_path: "demo/contrat_crm_premium.docx",
+            file_size: 125000,
+            mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            category: "contrat",
+            version: 3,
+            is_active: true,
+            uploaded_by: "demo-user",
+            created_at: "2024-01-10T08:30:00Z",
+            updated_at: "2024-02-20T14:10:00Z"
+          },
+          {
+            id: "doc_007",
+            title: "Contrat Secteur Santé",
+            description: "Contrat spécialisé pour pharmacies et établissements de santé",
+            file_name: "contrat_sante.docx",
+            file_path: "demo/contrat_sante.docx",
+            file_size: 98000,
+            mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            category: "contrat",
+            version: 1,
+            is_active: true,
+            uploaded_by: "demo-user",
+            created_at: "2024-02-15T10:45:00Z",
+            updated_at: "2024-02-15T10:45:00Z"
+          },
+          {
+            id: "doc_008",
+            title: "Contrat Hôtellerie",
+            description: "Contrat adapté au secteur hôtelier et de l'hospitalité",
+            file_name: "contrat_hotellerie.docx",
+            file_path: "demo/contrat_hotellerie.docx",
+            file_size: 110000,
+            mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            category: "contrat",
+            version: 2,
+            is_active: true,
+            uploaded_by: "demo-user",
+            created_at: "2024-01-25T15:20:00Z",
+            updated_at: "2024-02-18T11:30:00Z"
+          }
+        ]
+
       case "admins":
         return [
           {
@@ -1265,7 +1687,16 @@ export class SupabaseClientDB {
 function initializeDemoData() {
   if (typeof window === "undefined") return
 
-  const dataTypes = ["organizations", "admins", "commerciaux", "contacts", "deals", "appointments", "contracts"]
+  const dataTypes = [
+    "organizations", 
+    "admins", 
+    "commerciaux", 
+    "contacts", 
+    "deals", 
+    "appointments", 
+    "contracts",
+    "crm_documents" // Ajout des documents CRM
+  ]
   
   dataTypes.forEach(type => {
     if (!localStorage.getItem(`demo_${type}`)) {
