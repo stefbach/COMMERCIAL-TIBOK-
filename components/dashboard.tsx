@@ -98,6 +98,19 @@ export function Dashboard() {
       
       console.log("[Dashboard] Data loaded:", { orgs: orgs.length, appointments: appointments.length, contracts: contracts.length })
       
+      // DEBUG: Afficher TOUTES les organisations et leurs champs
+      console.log("[Dashboard] ALL ORGANIZATIONS DATA:")
+      orgs.forEach((org, index) => {
+        console.log(`Org ${index}:`, {
+          id: org.id,
+          name: org.name,
+          district: org.district,
+          region: org.region,
+          zone_geographique: org.zone_geographique,
+          allFields: Object.keys(org)
+        })
+      })
+      
       setOrganizations(orgs)
       setAllAppointments(appointments)
       setAllContracts(contracts)
@@ -516,55 +529,76 @@ export function Dashboard() {
             </TabsContent>
 
             <TabsContent value="districts" className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
-                {districtGroups.slice(0, 16).map((group) => (
-                  <div
-                    key={group.district}
-                    className="p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors border-l-4 border-l-cyan-500"
-                    onClick={() => handleZoneClick("district", group.district)}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-sm truncate">{group.district}</h4>
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        {group.count}
-                      </Badge>
-                    </div>
-                    
-                    {group.zone && (
-                      <div className="flex items-center gap-1 mb-2">
-                        <MapPin className="h-3 w-3 text-gray-400" />
-                        <span className="text-xs text-gray-500">{group.zone}</span>
-                      </div>
-                    )}
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h4 className="font-bold text-sm text-yellow-800">DEBUG Info:</h4>
+                <p className="text-xs text-yellow-700">
+                  Total organisations: {organizations.length} | 
+                  Districts trouvés: {districtGroups.length} | 
+                  Ouvrez la console (F12) pour voir le détail complet
+                </p>
+                {districtGroups.length > 0 && (
+                  <p className="text-xs text-yellow-700 mt-1">
+                    Districts: {districtGroups.map(d => d.district).join(', ')}
+                  </p>
+                )}
+              </div>
 
-                    <div className="flex justify-around text-xs mb-2">
-                      <div className="text-center">
-                        <div className="font-bold text-green-600">{group.appointmentCount}</div>
-                        <div className="text-muted-foreground">RDV</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+                {districtGroups.length === 0 ? (
+                  <div className="col-span-full text-center p-8 text-gray-500">
+                    <p>Aucun district trouvé</p>
+                    <p className="text-sm mt-2">Vérifiez la console pour voir les données récupérées</p>
+                  </div>
+                ) : (
+                  districtGroups.slice(0, 16).map((group) => (
+                    <div
+                      key={group.district}
+                      className="p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors border-l-4 border-l-cyan-500"
+                      onClick={() => handleZoneClick("district", group.district)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-sm truncate">{group.district}</h4>
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          {group.count}
+                        </Badge>
                       </div>
-                      <div className="text-center">
-                        <div className="font-bold text-blue-600">{group.contractCount}</div>
-                        <div className="text-muted-foreground">Contrats</div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      {group.organizations.slice(0, 2).map((org) => (
-                        <div key={org.id} className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600 truncate">{org.name}</span>
-                          <Badge className={getStatusColor(org.status || "")} variant="secondary" size="sm">
-                            {org.status}
-                          </Badge>
-                        </div>
-                      ))}
-                      {group.organizations.length > 2 && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          +{group.organizations.length - 2} autres...
+                      
+                      {group.zone && (
+                        <div className="flex items-center gap-1 mb-2">
+                          <MapPin className="h-3 w-3 text-gray-400" />
+                          <span className="text-xs text-gray-500">{group.zone}</span>
                         </div>
                       )}
+
+                      <div className="flex justify-around text-xs mb-2">
+                        <div className="text-center">
+                          <div className="font-bold text-green-600">{group.appointmentCount}</div>
+                          <div className="text-muted-foreground">RDV</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-bold text-blue-600">{group.contractCount}</div>
+                          <div className="text-muted-foreground">Contrats</div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        {group.organizations.slice(0, 2).map((org) => (
+                          <div key={org.id} className="flex items-center justify-between">
+                            <span className="text-xs text-gray-600 truncate">{org.name}</span>
+                            <Badge className={getStatusColor(org.status || "")} variant="secondary" size="sm">
+                              {org.status}
+                            </Badge>
+                          </div>
+                        ))}
+                        {group.organizations.length > 2 && (
+                          <div className="text-xs text-gray-400 mt-1">
+                            +{group.organizations.length - 2} autres...
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
               
               {districtGroups.length > 16 && (
