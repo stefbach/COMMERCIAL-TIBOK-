@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Building2, 
   MapPin, 
@@ -13,7 +15,12 @@ import {
   FileText,
   Map,
   Navigation,
-  BarChart3
+  BarChart3,
+  CalendarClock,
+  FileCheck,
+  Send,
+  DollarSign,
+  Trophy
 } from "lucide-react"
 import type { Organization } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
@@ -23,6 +30,10 @@ interface DashboardStats {
   activeOrganizations: number
   prospectOrganizations: number
   totalRooms: number
+  completedAppointments: number
+  upcomingAppointments: number
+  signedContracts: number
+  sentContracts: number
 }
 
 interface GeographicalGroup {
@@ -30,6 +41,8 @@ interface GeographicalGroup {
   count: number
   organizations: Organization[]
   percentage: number
+  appointmentCount: number
+  contractCount: number
 }
 
 interface DistrictGroup {
@@ -37,6 +50,20 @@ interface DistrictGroup {
   count: number
   organizations: Organization[]
   zone?: string
+  appointmentCount: number
+  contractCount: number
+}
+
+interface ZoneDetails {
+  type: "geographical" | "district"
+  name: string
+  organizations: any[]
+  stats: {
+    organizationCount: number
+    appointmentCount: number
+    contractCount: number
+  }
+  cities?: string[]
 }
 
 export function Dashboard() {
@@ -47,9 +74,16 @@ export function Dashboard() {
     activeOrganizations: 0,
     prospectOrganizations: 0,
     totalRooms: 0,
+    completedAppointments: 0,
+    upcomingAppointments: 0,
+    signedContracts: 0,
+    sentContracts: 0,
   })
   const [geographicalGroups, setGeographicalGroups] = useState<GeographicalGroup[]>([])
   const [districtGroups, setDistrictGroups] = useState<DistrictGroup[]>([])
+  const [selectedZone, setSelectedZone] = useState<ZoneDetails | null>(null)
+  const [allAppointments, setAllAppointments] = useState<any[]>([])
+  const [allContracts, setAllContracts] = useState<any[]>([])
 
   useEffect(() => {
     loadDashboardData()
@@ -59,12 +93,18 @@ export function Dashboard() {
     try {
       console.log("[Dashboard] Loading data...")
       const orgs = await SupabaseClientDB.getOrganizations()
-      console.log("[Dashboard] Organizations loaded:", orgs.length)
+      const appointments = await SupabaseClientDB.getAppointments()
+      const contracts = await SupabaseClientDB.getContracts()
+      
+      console.log("[Dashboard] Data loaded:", { orgs: orgs.length, appointments: appointments.length, contracts: contracts.length })
       
       setOrganizations(orgs)
-      calculateStats(orgs)
-      calculateGeographicalGroups(orgs)
-      calculateDistrictGroups(orgs)
+      setAllAppointments(appointments)
+      setAllContracts(contracts)
+      
+      calculateStats(orgs, appointments, contracts)
+      calculateGeographicalGroups(orgs, appointments, contracts)
+      calculateDistrictGroups(orgs, appointments, contracts)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -72,32 +112,66 @@ export function Dashboard() {
     }
   }
 
-  const calculateStats = (orgs: Organization[]) => {
+  const calculateStats = (orgs: Organization[], appointments: any[], contracts: any[]) => {
     const totalOrganizations = orgs.length
     const activeOrganizations = orgs.filter(org => org.status?.toLowerCase() === 'active').length
     const prospectOrganizations = orgs.filter(org => org.status?.toLowerCase() === 'prospect').length
     const totalRooms = orgs.reduce((sum, org) => sum + (org.nb_chambres || 0), 0)
+
+    // Calcul des appointments
+    const completedAppointments = appointments.filter(
+      (apt) => apt.status === "Completed" || apt.status === "completed"
+    ).length
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const upcomingAppointments = appointments.filter((apt) => {
+      const isScheduled = apt.status === "Scheduled" || apt.status === "scheduled"
+      const appointmentDate = new Date(apt.date || apt.appointment_date)
+      return isScheduled && appointmentDate >= today
+    }).length
+
+    // Calcul des contrats
+    const signedContracts = contracts.filter((contract) => contract.status === "signed").length
+    const sentContracts = contracts.filter(
+      (contract) => contract.status === "sent" || contract.status === "contrat_envoye"
+    ).length
 
     setStats({
       totalOrganizations,
       activeOrganizations,
       prospectOrganizations,
       totalRooms,
+      completedAppointments,
+      upcomingAppointments,
+      signedContracts,
+      sentContracts,
     })
   }
 
-  const calculateGeographicalGroups = (orgs: Organization[]) => {
+  const calculateGeographicalGroups = (orgs: Organization[], appointments: any[], contracts: any[]) => {
     const zones = ['Nord', 'Sud', 'Est', 'Ouest', 'Centre']
     const groups: GeographicalGroup[] = []
 
     zones.forEach(zone => {
       const zoneOrgs = orgs.filter(org => org.region?.toLowerCase() === zone.toLowerCase())
-      if (zoneOrgs.length > 0 || zone !== 'Centre') { // Toujours afficher les 4 zones principales
+      
+      // Calculer les appointments et contrats pour cette zone
+      const zoneAppointments = appointments.filter(apt => 
+        zoneOrgs.some(org => org.id === apt.organizationId)
+      )
+      const zoneContracts = contracts.filter(contract => 
+        zoneOrgs.some(org => org.id === contract.organizationId)
+      )
+
+      if (zoneOrgs.length > 0 || zone !== 'Centre') {
         groups.push({
           zone,
           count: zoneOrgs.length,
           organizations: zoneOrgs,
-          percentage: orgs.length > 0 ? Math.round((zoneOrgs.length / orgs.length) * 100) : 0
+          percentage: orgs.length > 0 ? Math.round((zoneOrgs.length / orgs.length) * 100) : 0,
+          appointmentCount: zoneAppointments.length,
+          contractCount: zoneContracts.length
         })
       }
     })
@@ -108,20 +182,28 @@ export function Dashboard() {
     )
     
     if (orgsWithoutZone.length > 0) {
+      const zoneAppointments = appointments.filter(apt => 
+        orgsWithoutZone.some(org => org.id === apt.organizationId)
+      )
+      const zoneContracts = contracts.filter(contract => 
+        orgsWithoutZone.some(org => org.id === contract.organizationId)
+      )
+
       groups.push({
         zone: 'Non définie',
         count: orgsWithoutZone.length,
         organizations: orgsWithoutZone,
-        percentage: orgs.length > 0 ? Math.round((orgsWithoutZone.length / orgs.length) * 100) : 0
+        percentage: orgs.length > 0 ? Math.round((orgsWithoutZone.length / orgs.length) * 100) : 0,
+        appointmentCount: zoneAppointments.length,
+        contractCount: zoneContracts.length
       })
     }
 
-    // Trier par nombre d'organisations (décroissant)
     groups.sort((a, b) => b.count - a.count)
     setGeographicalGroups(groups)
   }
 
-  const calculateDistrictGroups = (orgs: Organization[]) => {
+  const calculateDistrictGroups = (orgs: Organization[], appointments: any[], contracts: any[]) => {
     const districtMap = new Map<string, DistrictGroup>()
 
     orgs.forEach(org => {
@@ -136,15 +218,66 @@ export function Dashboard() {
           district,
           count: 1,
           organizations: [org],
-          zone: org.region
+          zone: org.region,
+          appointmentCount: 0,
+          contractCount: 0
         })
       }
     })
 
+    // Calculer les appointments et contrats pour chaque district
+    districtMap.forEach((group, district) => {
+      const districtAppointments = appointments.filter(apt => 
+        group.organizations.some(org => org.id === apt.organizationId)
+      )
+      const districtContracts = contracts.filter(contract => 
+        group.organizations.some(org => org.id === contract.organizationId)
+      )
+      
+      group.appointmentCount = districtAppointments.length
+      group.contractCount = districtContracts.length
+    })
+
     const groups = Array.from(districtMap.values())
-    // Trier par nombre d'organisations (décroissant)
     groups.sort((a, b) => b.count - a.count)
     setDistrictGroups(groups)
+  }
+
+  const handleZoneClick = (type: ZoneDetails["type"], name: string) => {
+    let filteredOrganizations: any[] = []
+
+    switch (type) {
+      case "geographical":
+        filteredOrganizations = organizations.filter(org => 
+          org.region?.toLowerCase() === name.toLowerCase() ||
+          (name === 'Non définie' && (!org.region || !['nord', 'sud', 'est', 'ouest', 'centre'].includes(org.region.toLowerCase())))
+        )
+        break
+      case "district":
+        filteredOrganizations = organizations.filter(org => 
+          (org.district?.trim() || 'Non défini') === name
+        )
+        break
+    }
+
+    const zoneAppointments = allAppointments.filter(apt =>
+      filteredOrganizations.some(org => org.id === apt.organizationId)
+    )
+
+    const zoneContracts = allContracts.filter(contract =>
+      filteredOrganizations.some(org => org.id === contract.organizationId)
+    )
+
+    setSelectedZone({
+      type,
+      name,
+      organizations: filteredOrganizations,
+      stats: {
+        organizationCount: filteredOrganizations.length,
+        appointmentCount: zoneAppointments.length,
+        contractCount: zoneContracts.length,
+      }
+    })
   }
 
   const getZoneIcon = (zone: string) => {
@@ -198,253 +331,291 @@ export function Dashboard() {
     <div className="p-6 space-y-6">
       {/* En-tête */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-primary mb-2">Dashboard Organisations Maurice</h1>
+        <h1 className="text-3xl font-bold text-primary mb-2">Dashboard CRM Maurice</h1>
         <p className="text-muted-foreground">
-          Vue d'ensemble de vos organisations par zones géographiques et districts
+          Vue d'ensemble complète : organisations, rendez-vous, contrats et répartition géographique
         </p>
       </div>
 
-      {/* Statistiques générales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-l-4 border-l-blue-500">
+      {/* Statistiques principales */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Total Organisations
-            </CardTitle>
-            <Building2 className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Organisations</CardTitle>
+            <Building2 className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-600">{stats.totalOrganizations}</div>
-            <p className="text-xs text-gray-500 mt-1">
-              Toutes les organisations enregistrées
-            </p>
+            <div className="text-2xl font-bold text-blue-600">{stats.totalOrganizations}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Organisations Actives
-            </CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Actives</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">{stats.activeOrganizations}</div>
-            <p className="text-xs text-gray-500 mt-1">
-              {stats.totalOrganizations > 0 ? Math.round((stats.activeOrganizations / stats.totalOrganizations) * 100) : 0}% du total
-            </p>
+            <div className="text-2xl font-bold text-green-600">{stats.activeOrganizations}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-yellow-500">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Prospects
-            </CardTitle>
-            <Users className="h-5 w-5 text-yellow-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">RDV Réalisés</CardTitle>
+            <Calendar className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">{stats.prospectOrganizations}</div>
-            <p className="text-xs text-gray-500 mt-1">
-              Opportunités à développer
-            </p>
+            <div className="text-2xl font-bold text-blue-600">{stats.completedAppointments}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-purple-500">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Total Chambres
-            </CardTitle>
-            <Calendar className="h-5 w-5 text-purple-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">RDV Prévus</CardTitle>
+            <CalendarClock className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{stats.totalRooms.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">
-              Capacité d'hébergement totale
-            </p>
+            <div className="text-2xl font-bold text-orange-600">{stats.upcomingAppointments}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Contrats Signés</CardTitle>
+            <FileCheck className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.signedContracts}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Contrats Envoyés</CardTitle>
+            <Send className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{stats.sentContracts}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Prospects</CardTitle>
+            <Users className="h-4 w-4 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{stats.prospectOrganizations}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Chambres</CardTitle>
+            <DollarSign className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{stats.totalRooms.toLocaleString()}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Regroupement par zones géographiques */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="col-span-1 lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Map className="h-6 w-6 text-primary" />
-              Répartition par Zones Géographiques
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Distribution des organisations à travers les régions de Maurice
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {geographicalGroups.map((group) => (
-                <div key={group.zone} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{getZoneIcon(group.zone)}</span>
-                      <h3 className="font-semibold text-lg">{group.zone}</h3>
-                    </div>
-                    <Badge className={getZoneColor(group.zone)} variant="secondary">
-                      {group.count}
-                    </Badge>
-                  </div>
-                  
-                  <Progress value={group.percentage} className="w-full h-2" />
-                  
-                  <div className="text-sm text-muted-foreground">
-                    {group.percentage}% ({group.count} organisations)
-                  </div>
-                  
-                  {group.count > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-gray-600">Aperçu:</p>
-                      {group.organizations.slice(0, 2).map((org) => (
-                        <div key={org.id} className="text-xs text-gray-500 truncate">
-                          • {org.name}
-                        </div>
-                      ))}
-                      {group.organizations.length > 2 && (
-                        <div className="text-xs text-gray-400">
-                          ... et {group.organizations.length - 2} autres
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Regroupement par districts */}
+      {/* Analyses avec onglets */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Navigation className="h-6 w-6 text-primary" />
-            Répartition par Districts
+            <BarChart3 className="h-5 w-5 text-primary" />
+            Analyses Détaillées
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Organisations regroupées par district administratif
-          </p>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {districtGroups.slice(0, 12).map((group) => (
-              <Card key={group.district} className="border-l-4 border-l-cyan-500">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-sm truncate">{group.district}</h4>
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {group.count}
-                    </Badge>
-                  </div>
-                  
-                  {group.zone && (
-                    <div className="flex items-center gap-1 mb-2">
-                      <MapPin className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">{group.zone}</span>
-                    </div>
-                  )}
-                  
-                  <div className="space-y-1">
-                    {group.organizations.slice(0, 3).map((org) => (
-                      <div key={org.id} className="flex items-center justify-between">
-                        <span className="text-xs text-gray-600 truncate">{org.name}</span>
-                        <Badge className={getStatusColor(org.status || "")} variant="secondary" size="sm">
-                          {org.status}
+          <Tabs defaultValue="zones" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="zones">Zones Géographiques</TabsTrigger>
+              <TabsTrigger value="districts">Districts</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="zones" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {geographicalGroups.map((group) => (
+                  <div
+                    key={group.zone}
+                    className="p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+                    onClick={() => handleZoneClick("geographical", group.zone)}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{getZoneIcon(group.zone)}</span>
+                          <h3 className="font-semibold text-lg">{group.zone}</h3>
+                        </div>
+                        <Badge className={getZoneColor(group.zone)} variant="secondary">
+                          {group.count}
                         </Badge>
                       </div>
-                    ))}
-                    {group.organizations.length > 3 && (
-                      <div className="text-xs text-gray-400 mt-1">
-                        +{group.organizations.length - 3} autres...
+                      
+                      <Progress value={group.percentage} className="w-full h-2" />
+                      
+                      <div className="text-sm text-muted-foreground">
+                        {group.percentage}% ({group.count} organisations)
+                      </div>
+
+                      <div className="flex justify-around text-xs">
+                        <div className="text-center">
+                          <div className="font-bold text-green-600">{group.appointmentCount}</div>
+                          <div className="text-muted-foreground">RDV</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-bold text-blue-600">{group.contractCount}</div>
+                          <div className="text-muted-foreground">Contrats</div>
+                        </div>
+                      </div>
+                      
+                      {group.count > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-gray-600">Aperçu:</p>
+                          {group.organizations.slice(0, 2).map((org) => (
+                            <div key={org.id} className="text-xs text-gray-500 truncate">
+                              • {org.name}
+                            </div>
+                          ))}
+                          {group.organizations.length > 2 && (
+                            <div className="text-xs text-gray-400">
+                              ... et {group.organizations.length - 2} autres
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="districts" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+                {districtGroups.slice(0, 16).map((group) => (
+                  <div
+                    key={group.district}
+                    className="p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors border-l-4 border-l-cyan-500"
+                    onClick={() => handleZoneClick("district", group.district)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-sm truncate">{group.district}</h4>
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {group.count}
+                      </Badge>
+                    </div>
+                    
+                    {group.zone && (
+                      <div className="flex items-center gap-1 mb-2">
+                        <MapPin className="h-3 w-3 text-gray-400" />
+                        <span className="text-xs text-gray-500">{group.zone}</span>
                       </div>
                     )}
+
+                    <div className="flex justify-around text-xs mb-2">
+                      <div className="text-center">
+                        <div className="font-bold text-green-600">{group.appointmentCount}</div>
+                        <div className="text-muted-foreground">RDV</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-bold text-blue-600">{group.contractCount}</div>
+                        <div className="text-muted-foreground">Contrats</div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      {group.organizations.slice(0, 2).map((org) => (
+                        <div key={org.id} className="flex items-center justify-between">
+                          <span className="text-xs text-gray-600 truncate">{org.name}</span>
+                          <Badge className={getStatusColor(org.status || "")} variant="secondary" size="sm">
+                            {org.status}
+                          </Badge>
+                        </div>
+                      ))}
+                      {group.organizations.length > 2 && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          +{group.organizations.length - 2} autres...
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          
-          {districtGroups.length > 12 && (
-            <div className="mt-4 text-center">
-              <p className="text-sm text-gray-500">
-                Et {districtGroups.length - 12} autres districts...
-              </p>
-            </div>
-          )}
+                ))}
+              </div>
+              
+              {districtGroups.length > 16 && (
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-500">
+                    Et {districtGroups.length - 16} autres districts...
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
-      {/* Insights rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-800">
-              <BarChart3 className="h-5 w-5" />
-              Zone la plus active
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {geographicalGroups.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">{getZoneIcon(geographicalGroups[0].zone)}</span>
-                  <span className="font-bold text-blue-900">{geographicalGroups[0].zone}</span>
-                </div>
-                <p className="text-sm text-blue-700">
-                  {geographicalGroups[0].count} organisations ({geographicalGroups[0].percentage}%)
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-800">
+      {/* Dialog pour les détails */}
+      <Dialog open={!!selectedZone} onOpenChange={() => setSelectedZone(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" />
-              District principal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {districtGroups.length > 0 && (
-              <div>
-                <p className="font-bold text-green-900">{districtGroups[0].district}</p>
-                <p className="text-sm text-green-700">
-                  {districtGroups[0].count} organisations
-                </p>
-                {districtGroups[0].zone && (
-                  <p className="text-xs text-green-600 mt-1">Zone: {districtGroups[0].zone}</p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              Détails - {selectedZone?.name}
+            </DialogTitle>
+          </DialogHeader>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-purple-800">
-              <FileText className="h-5 w-5" />
-              Couverture territoriale
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div>
-              <p className="font-bold text-purple-900">{districtGroups.length}</p>
-              <p className="text-sm text-purple-700">districts couverts</p>
-              <p className="text-xs text-purple-600 mt-1">
-                sur {geographicalGroups.filter(g => g.zone !== 'Non définie').length} zones géographiques
-              </p>
+          {selectedZone && (
+            <div className="space-y-6">
+              {/* Stats Summary */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <div className="text-2xl font-bold text-primary">{selectedZone.stats.organizationCount}</div>
+                  <div className="text-sm text-muted-foreground">Organisations</div>
+                </div>
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{selectedZone.stats.appointmentCount}</div>
+                  <div className="text-sm text-muted-foreground">Rendez-vous</div>
+                </div>
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{selectedZone.stats.contractCount}</div>
+                  <div className="text-sm text-muted-foreground">Contrats</div>
+                </div>
+              </div>
+
+              {/* Organizations List */}
+              <div>
+                <h4 className="font-semibold mb-4">Organisations ({selectedZone.organizations.length}):</h4>
+                <div className="grid gap-3 max-h-96 overflow-y-auto">
+                  {selectedZone.organizations.map((org, index) => (
+                    <div key={org.id || index} className="p-3 border rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h5 className="font-medium">{org.name}</h5>
+                          <p className="text-sm text-muted-foreground">
+                            {org.district} - {org.region}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {org.nb_chambres && `${org.nb_chambres} chambres`}
+                          </p>
+                        </div>
+                        <div className="text-right text-sm">
+                          <Badge className={getStatusColor(org.status || "")} variant="secondary">
+                            {org.status}
+                          </Badge>
+                          {org.phone && <div className="text-muted-foreground mt-1">{org.phone}</div>}
+                          {org.email && <div className="text-muted-foreground">{org.email}</div>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
