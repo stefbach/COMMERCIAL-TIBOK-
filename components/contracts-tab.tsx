@@ -109,7 +109,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         }),
       )
 
-      // ✅ STRUCTURE EXACTE - Correspondant à votre table contracts
+      // ✅ STRUCTURE COMPLÈTE - Avec les colonnes créées/modifiées
       const contractData = {
         organization_id: formData.organizationId,
         contact_id: null,
@@ -121,6 +121,9 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         notes: "",
         sent_date: formData.sentDate ? new Date(formData.sentDate) : null,
         documents: documents,
+        // ✅ AJOUTÉ pour éviter les erreurs de cache
+        created_date: new Date(),
+        updated_date: new Date(),
       }
 
       console.log("[CONTRACTS] Contract input prepared:", contractData)
