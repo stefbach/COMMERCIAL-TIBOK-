@@ -18,6 +18,8 @@ interface CreateOrganizationModalProps {
 
 export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrganizationModalProps) {
   const [loading, setLoading] = useState(false)
+  
+  // Formulaire avec SEULEMENT les champs de votre table Supabase
   const [formData, setFormData] = useState({
     name: "",
     industry: "",
@@ -33,10 +35,8 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
     phone: "",
     email: "",
     contact_principal: "",
-    contact_fonction: "",
     notes: "",
-    status: "Prospect" as const,
-    priority: "Medium" as const,
+    status: "prospect" as const,
   })
 
   const resetForm = () => {
@@ -55,10 +55,8 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
       phone: "",
       email: "",
       contact_principal: "",
-      contact_fonction: "",
       notes: "",
-      status: "Prospect",
-      priority: "Medium",
+      status: "prospect",
     })
   }
 
@@ -76,19 +74,33 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
 
     setLoading(true)
     try {
+      // Données strictement alignées sur votre schéma DB
       const orgData: Omit<Organization, "id" | "created_at" | "updated_at"> = {
-        ...formData,
+        name: formData.name.trim(),
+        industry: formData.industry.trim() || undefined,
+        category: formData.category || undefined,
+        region: formData.region || undefined,
+        zone_geographique: formData.zone_geographique.trim() || undefined,
+        district: formData.district.trim() || undefined,
+        city: formData.city.trim() || undefined,
+        address: formData.address.trim() || undefined,
+        secteur: formData.secteur.trim() || undefined,
+        website: formData.website.trim() || undefined,
         nb_chambres: formData.nb_chambres ? parseInt(formData.nb_chambres) : undefined,
-        size: "Medium", // Valeur par défaut
-        country: "Maurice", // Valeur par défaut pour Maurice
-        prospectStatus: "not_contacted", // Valeur par défaut
-        source: "Manuel", // Indique que c'est une saisie manuelle
+        phone: formData.phone.trim() || undefined,
+        email: formData.email.trim() || undefined,
+        contact_principal: formData.contact_principal.trim() || undefined,
+        notes: formData.notes.trim() || undefined,
+        status: formData.status,
+        // Champs temporaires pour compatibilité d'affichage
+        activityType: formData.industry.trim() || undefined,
       }
 
       await onSubmit(orgData)
       resetForm()
     } catch (error) {
       console.error("Erreur lors de la création:", error)
+      alert("Erreur lors de la création de l'organisation")
     } finally {
       setLoading(false)
     }
@@ -109,7 +121,7 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informations de base */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Informations de base</h3>
+            <h3 className="text-lg font-semibold text-primary">Informations générales</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="name">Nom de l'organisation *</Label>
@@ -119,6 +131,7 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Hôtel Paradise Resort"
                   required
+                  className="border-2 focus:border-primary"
                 />
               </div>
               <div>
@@ -140,19 +153,19 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
                   onValueChange={(value) => setFormData({ ...formData, category: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
+                    <SelectValue placeholder="Choisir catégorie" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1 étoile">1 étoile</SelectItem>
-                    <SelectItem value="2 étoiles">2 étoiles</SelectItem>
-                    <SelectItem value="3 étoiles">3 étoiles</SelectItem>
-                    <SelectItem value="4 étoiles">4 étoiles</SelectItem>
-                    <SelectItem value="5 étoiles">5 étoiles</SelectItem>
+                    <SelectItem value="1 étoile">⭐ 1 étoile</SelectItem>
+                    <SelectItem value="2 étoiles">⭐⭐ 2 étoiles</SelectItem>
+                    <SelectItem value="3 étoiles">⭐⭐⭐ 3 étoiles</SelectItem>
+                    <SelectItem value="4 étoiles">⭐⭐⭐⭐ 4 étoiles</SelectItem>
+                    <SelectItem value="5 étoiles">⭐⭐⭐⭐⭐ 5 étoiles</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="secteur">Secteur</Label>
+                <Label htmlFor="secteur">Secteur d'activité</Label>
                 <Input
                   id="secteur"
                   value={formData.secteur}
@@ -165,6 +178,8 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
                 <Input
                   id="nb_chambres"
                   type="number"
+                  min="0"
+                  max="10000"
                   value={formData.nb_chambres}
                   onChange={(e) => setFormData({ ...formData, nb_chambres: e.target.value })}
                   placeholder="120"
@@ -175,7 +190,7 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
 
           {/* Localisation */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Localisation</h3>
+            <h3 className="text-lg font-semibold text-primary">Localisation à Maurice</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="region">Région</Label>
@@ -184,14 +199,14 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
                   onValueChange={(value) => setFormData({ ...formData, region: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
+                    <SelectValue placeholder="Choisir région" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Nord">Nord</SelectItem>
-                    <SelectItem value="Sud">Sud</SelectItem>
-                    <SelectItem value="Est">Est</SelectItem>
-                    <SelectItem value="Ouest">Ouest</SelectItem>
-                    <SelectItem value="Centre">Centre</SelectItem>
+                    <SelectItem value="Nord">🧭 Nord</SelectItem>
+                    <SelectItem value="Sud">🧭 Sud</SelectItem>
+                    <SelectItem value="Est">🧭 Est</SelectItem>
+                    <SelectItem value="Ouest">🧭 Ouest</SelectItem>
+                    <SelectItem value="Centre">🧭 Centre</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -210,7 +225,7 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
                   id="zone_geographique"
                   value={formData.zone_geographique}
                   onChange={(e) => setFormData({ ...formData, zone_geographique: e.target.value })}
-                  placeholder="Zone touristique..."
+                  placeholder="Zone côtière, montagnarde..."
                 />
               </div>
             </div>
@@ -222,7 +237,7 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
                   id="city"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="Grand Baie, Port Louis..."
+                  placeholder="Grand Baie, Port Louis, Flic en Flac..."
                 />
               </div>
               <div>
@@ -237,21 +252,22 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
             </div>
           </div>
 
-          {/* Contact */}
+          {/* Contact & Communication */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Informations de contact</h3>
+            <h3 className="text-lg font-semibold text-primary">Contact & Communication</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="phone">Téléphone</Label>
                 <Input
                   id="phone"
+                  type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="+230 123 4567"
                 />
               </div>
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email professionnel</Label>
                 <Input
                   id="email"
                   type="email"
@@ -262,17 +278,17 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="website">Site web</Label>
-              <Input
-                id="website"
-                value={formData.website}
-                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                placeholder="https://www.hotel.com"
-              />
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="website">Site web</Label>
+                <Input
+                  id="website"
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  placeholder="https://www.hotel.mu"
+                />
+              </div>
               <div>
                 <Label htmlFor="contact_principal">Contact principal</Label>
                 <Input
@@ -282,24 +298,15 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
                   placeholder="Jean Dupont"
                 />
               </div>
-              <div>
-                <Label htmlFor="contact_fonction">Fonction du contact</Label>
-                <Input
-                  id="contact_fonction"
-                  value={formData.contact_fonction}
-                  onChange={(e) => setFormData({ ...formData, contact_fonction: e.target.value })}
-                  placeholder="Manager, Directeur..."
-                />
-              </div>
             </div>
           </div>
 
-          {/* Qualification */}
+          {/* Statut & Notes */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Qualification</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 className="text-lg font-semibold text-primary">Statut & Remarques</h3>
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <Label htmlFor="status">Statut</Label>
+                <Label htmlFor="status">Statut initial</Label>
                 <Select
                   value={formData.status}
                   onValueChange={(value: any) => setFormData({ ...formData, status: value })}
@@ -308,43 +315,24 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Prospect">Prospect</SelectItem>
-                    <SelectItem value="Active">Actif</SelectItem>
-                    <SelectItem value="Inactive">Inactif</SelectItem>
+                    <SelectItem value="prospect">🎯 Prospect</SelectItem>
+                    <SelectItem value="active">✅ Actif</SelectItem>
+                    <SelectItem value="inactive">⏸️ Inactif</SelectItem>
+                    <SelectItem value="client">💼 Client</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="priority">Priorité</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value: any) => setFormData({ ...formData, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="High">Haute</SelectItem>
-                    <SelectItem value="Medium">Moyenne</SelectItem>
-                    <SelectItem value="Low">Basse</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="notes">Notes et commentaires</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Notes importantes, contexte, historique..."
+                  rows={4}
+                  className="resize-none"
+                />
               </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Notes</h3>
-            <div>
-              <Label htmlFor="notes">Commentaires</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Notes additionnelles sur cette organisation..."
-                rows={3}
-              />
             </div>
           </div>
 
@@ -353,16 +341,17 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateOrg
             <Button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-primary hover:bg-primary/90"
+              className="flex-1 bg-primary hover:bg-primary/90 text-white font-medium"
             >
               <Save className="w-4 h-4 mr-2" />
-              {loading ? "Création..." : "Créer l'Organisation"}
+              {loading ? "Création en cours..." : "Créer l'Organisation"}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
               disabled={loading}
+              className="px-8"
             >
               <X className="w-4 h-4 mr-2" />
               Annuler
