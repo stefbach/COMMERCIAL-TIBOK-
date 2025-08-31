@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, FileText, Trash2, Edit, Plus, Upload, Download, X } from "lucide-react"
 import { type Contract, type Organization, type Contact } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
+import { createClient } from "@/lib/supabase/client"
 
 interface ContractsTabProps {
   organizations: Organization[]
@@ -26,6 +27,177 @@ const CONTRACT_STATUS_LABELS = {
 } as const
 
 type ContractStatus = keyof typeof CONTRACT_STATUS_LABELS
+
+// ✅ AJOUT : Composant de debug frontend
+const ContractFrontendDebugger = () => {
+  const [contractId, setContractId] = useState('d816d1d8-b622-456d-8354-d087f8684319');
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
+  const supabase = createClient();
+
+  const testDirectUpdate = async () => {
+    setIsLoading(true);
+    console.clear();
+    console.log('🧪 TESTING CONTRACT UPDATE FROM FRONTEND');
+    
+    try {
+      const { data: before } = await supabase
+        .from('contracts')
+        .select('*')
+        .eq('id', contractId)
+        .single();
+        
+      console.log('📋 Before update:', before);
+      
+      const testUpdate = {
+        sent_date: new Date().toISOString(),
+        signed_date: new Date().toISOString(),
+        status: 'envoye'
+      };
+      
+      console.log('📤 Sending update:', testUpdate);
+      
+      const result = await SupabaseClientDB.updateContract(contractId, testUpdate);
+      console.log('✅ UpdateContract result:', result);
+      
+      // Vérification immédiate
+      const { data: verification } = await supabase
+        .from('contracts')
+        .select('id, status, sent_date, signed_date, updated_date')
+        .eq('id', contractId)
+        .single();
+        
+      console.log('🔍 DB Verification immediately after:', verification);
+      
+      setLastResult({ success: true, data: result, verification });
+      alert('✅ Test direct réussi ! Vérifiez la console.');
+      
+    } catch (error) {
+      console.error('💥 Test failed:', error);
+      setLastResult({ success: false, error: error.message });
+      alert('❌ Test direct échoué. Vérifiez la console.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const testSendProcess = async () => {
+    setIsLoading(true);
+    console.clear();
+    console.log('🧪 TESTING SEND PROCESS');
+    
+    try {
+      // Simuler votre processus d'envoi exact
+      const now = new Date().toISOString();
+      console.log(`[SEND] Using date: ${now}`);
+      
+      const result = await SupabaseClientDB.updateContract(contractId, {
+        sent_date: now,
+        status: 'envoye'
+      });
+      
+      console.log('[SEND] ✅ Send result:', result);
+      
+      // Vérification immédiate
+      const { data: verification } = await supabase
+        .from('contracts')
+        .select('id, status, sent_date, signed_date, updated_date')
+        .eq('id', contractId)
+        .single();
+        
+      console.log('[SEND] 🔍 DB Verification:', verification);
+      
+      setLastResult({ success: true, data: result, verification });
+      alert('✅ Test envoi terminé ! Vérifiez la console.');
+      
+    } catch (error) {
+      console.error('[SEND] ❌ Send failed:', error);
+      setLastResult({ success: false, error: error.message });
+      alert('❌ Test envoi échoué. Vérifiez la console.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const testSignProcess = async () => {
+    setIsLoading(true);
+    console.clear();
+    console.log('🧪 TESTING SIGN PROCESS');
+    
+    try {
+      const now = new Date().toISOString();
+      console.log(`[SIGN] Using date: ${now}`);
+      
+      const result = await SupabaseClientDB.updateContract(contractId, {
+        signed_date: now,
+        status: 'signe'
+      });
+      
+      console.log('[SIGN] ✅ Sign result:', result);
+      
+      // Vérification immédiate
+      const { data: verification } = await supabase
+        .from('contracts')
+        .select('id, status, sent_date, signed_date, updated_date')
+        .eq('id', contractId)
+        .single();
+        
+      console.log('[SIGN] 🔍 DB Verification:', verification);
+      
+      setLastResult({ success: true, data: result, verification });
+      alert('✅ Test signature terminé ! Vérifiez la console.');
+      
+    } catch (error) {
+      console.error('[SIGN] ❌ Sign failed:', error);
+      setLastResult({ success: false, error: error.message });
+      alert('❌ Test signature échoué. Vérifiez la console.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card className="mb-6 border-purple-200 bg-purple-50">
+      <CardHeader>
+        <CardTitle className="text-purple-800">🔧 Debug Frontend Contrats</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex gap-2 items-center">
+            <Input 
+              placeholder="Contract ID" 
+              value={contractId}
+              onChange={(e) => setContractId(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={testDirectUpdate} disabled={isLoading} size="sm">
+              Test Direct
+            </Button>
+            <Button onClick={testSendProcess} disabled={isLoading} size="sm" variant="outline">
+              Test Envoi
+            </Button>
+            <Button onClick={testSignProcess} disabled={isLoading} size="sm" variant="secondary">
+              Test Signature
+            </Button>
+          </div>
+          
+          {lastResult && (
+            <div className="bg-white p-3 rounded border max-h-40 overflow-auto">
+              <h4 className="font-bold text-sm">Dernier résultat :</h4>
+              <pre className="text-xs mt-2">
+                {JSON.stringify(lastResult, null, 2)}
+              </pre>
+            </div>
+          )}
+          
+          <p className="text-xs text-purple-600">
+            💡 Ouvrez la console (F12) pour voir tous les détails du debug
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
   const [contracts, setContracts] = useState<Contract[]>([])
@@ -116,25 +288,27 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         description: formData.description,
         status: formData.status,
         signed_date: formData.status === "signe" && formData.signatureDate 
-          ? new Date(formData.signatureDate) 
+          ? new Date(formData.signatureDate).toISOString()
           : null,
+        sent_date: formData.sentDate ? new Date(formData.sentDate).toISOString() : null,
         notes: "",
-        sent_date: formData.sentDate ? new Date(formData.sentDate) : null,
         documents: documents,
         // ✅ AJOUTÉ pour éviter les erreurs de cache
-        created_date: new Date(),
-        updated_date: new Date(),
+        created_date: new Date().toISOString(),
+        updated_date: new Date().toISOString(),
       }
 
       console.log("[CONTRACTS] Contract input prepared:", contractData)
 
       let result
       if (editingContract) {
+        console.log("[CONTRACTS] ⚡ UPDATING existing contract:", editingContract.id)
         result = await SupabaseClientDB.updateContract(editingContract.id, contractData)
-        console.log("[CONTRACTS] Contract updated successfully")
+        console.log("[CONTRACTS] Contract updated successfully:", result)
       } else {
+        console.log("[CONTRACTS] ⚡ CREATING new contract")
         result = await SupabaseClientDB.createContract(contractData)
-        console.log("[CONTRACTS] Contract created successfully")
+        console.log("[CONTRACTS] Contract created successfully:", result)
       }
 
       await loadContracts()
@@ -152,10 +326,82 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     }
   }
 
+  // ✅ AJOUT : Fonctions de test pour les boutons d'action
+  const handleSendContract = async (contractId: string) => {
+    console.log(`[SEND] ⚡ Starting send process for contract: ${contractId}`);
+    
+    try {
+      const now = new Date().toISOString();
+      console.log(`[SEND] Using date: ${now}`);
+      
+      const result = await SupabaseClientDB.updateContract(contractId, {
+        sent_date: now,
+        status: 'envoye'
+      });
+      
+      console.log(`[SEND] ✅ Contract sent successfully:`, result);
+      
+      // Vérifier immédiatement dans la DB
+      const supabase = createClient();
+      const { data: verification } = await supabase
+        .from('contracts')
+        .select('id, status, sent_date, signed_date')
+        .eq('id', contractId)
+        .single();
+        
+      console.log(`[SEND] 🔍 Verification check:`, verification);
+      
+      // Recharger la liste
+      await loadContracts();
+      
+      alert('✅ Contrat envoyé avec succès !');
+      
+    } catch (error) {
+      console.error('[SEND] ❌ Send failed:', error);
+      alert(`❌ Erreur envoi: ${error.message}`);
+    }
+  };
+
+  const handleSignContract = async (contractId: string) => {
+    console.log(`[SIGN] ⚡ Starting sign process for contract: ${contractId}`);
+    
+    try {
+      const now = new Date().toISOString();
+      console.log(`[SIGN] Using date: ${now}`);
+      
+      const result = await SupabaseClientDB.updateContract(contractId, {
+        signed_date: now,
+        status: 'signe'
+      });
+      
+      console.log(`[SIGN] ✅ Contract signed successfully:`, result);
+      
+      // Vérifier immédiatement dans la DB
+      const supabase = createClient();
+      const { data: verification } = await supabase
+        .from('contracts')
+        .select('id, status, sent_date, signed_date')
+        .eq('id', contractId)
+        .single();
+        
+      console.log(`[SIGN] 🔍 Verification check:`, verification);
+      
+      // Recharger la liste
+      await loadContracts();
+      
+      alert('✅ Contrat signé avec succès !');
+      
+    } catch (error) {
+      console.error('[SIGN] ❌ Sign failed:', error);
+      alert(`❌ Erreur signature: ${error.message}`);
+    }
+  };
+
   const handleDelete = async (contractId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce contrat ?")) return
 
     try {
+      console.log("[CONTRACTS] ⚡ Deleting contract:", contractId)
       await SupabaseClientDB.deleteContract(contractId)
       console.log("[CONTRACTS] Contract deleted successfully")
       await loadContracts()
@@ -202,16 +448,18 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     setSelectedFiles([])
     setShowForm(false)
     setEditingContract(null)
+    console.log("[CONTRACTS] ⚡ Form reset completed")
   }
 
   const startEdit = (contract: Contract) => {
+    console.log("[CONTRACTS] ⚡ Starting edit for contract:", contract.id)
     setEditingContract(contract)
     setFormData({
       description: contract.description || "",
       organizationId: contract.organization_id || "",
       status: (contract.status as ContractStatus) || "envoye",
-      sentDate: contract.sent_date ? contract.sent_date.toISOString().split("T")[0] : "",
-      signatureDate: contract.signed_date ? contract.signed_date.toISOString().split("T")[0] : "",
+      sentDate: contract.sent_date ? new Date(contract.sent_date).toISOString().split("T")[0] : "",
+      signatureDate: contract.signed_date ? new Date(contract.signed_date).toISOString().split("T")[0] : "",
     })
     setSelectedFiles([])
     setShowForm(true)
@@ -290,6 +538,9 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* ✅ AJOUT DU COMPOSANT DE DEBUG */}
+      <ContractFrontendDebugger />
+
       {showMigrationAlert && organizations.length === 0 && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="p-4">
@@ -584,6 +835,9 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                         <Badge className={getStatusBadgeColor(contract.status)}>
                           {CONTRACT_STATUS_LABELS[contract.status as ContractStatus] || contract.status}
                         </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          ID: {contract.id.slice(-8)}
+                        </Badge>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
@@ -636,6 +890,29 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                           </div>
                         </div>
                       )}
+
+                      {/* ✅ AJOUT : Boutons d'action pour tester */}
+                      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-xs font-medium text-yellow-800 mb-2">🧪 Actions de Test :</p>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSendContract(contract.id)}
+                            className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                          >
+                            📤 Marquer Envoyé
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSignContract(contract.id)}
+                            className="text-green-600 border-green-200 hover:bg-green-50"
+                          >
+                            ✍️ Marquer Signé
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex gap-2 ml-4">
                       <Button variant="outline" size="sm" onClick={() => startEdit(contract)}>
