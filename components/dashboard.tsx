@@ -63,7 +63,6 @@ interface ZoneDetails {
     appointmentCount: number
     contractCount: number
   }
-  cities?: string[]
 }
 
 export function Dashboard() {
@@ -96,19 +95,10 @@ export function Dashboard() {
       const appointments = await SupabaseClientDB.getAppointments()
       const contracts = await SupabaseClientDB.getContracts()
       
-      console.log("[Dashboard] Data loaded:", { orgs: orgs.length, appointments: appointments.length, contracts: contracts.length })
-      
-      // DEBUG: Afficher TOUTES les organisations et leurs champs
-      console.log("[Dashboard] ALL ORGANIZATIONS DATA:")
-      orgs.forEach((org, index) => {
-        console.log(`Org ${index}:`, {
-          id: org.id,
-          name: org.name,
-          district: org.district,
-          region: org.region,
-          zone_geographique: org.zone_geographique,
-          allFields: Object.keys(org)
-        })
+      console.log("[Dashboard] Data loaded:", { 
+        orgs: orgs.length, 
+        appointments: appointments.length, 
+        contracts: contracts.length 
       })
       
       setOrganizations(orgs)
@@ -131,7 +121,6 @@ export function Dashboard() {
     const prospectOrganizations = orgs.filter(org => org.status?.toLowerCase() === 'prospect').length
     const totalRooms = orgs.reduce((sum, org) => sum + (org.nb_chambres || 0), 0)
 
-    // Calcul des appointments
     const completedAppointments = appointments.filter(
       (apt) => apt.status === "Completed" || apt.status === "completed"
     ).length
@@ -144,7 +133,6 @@ export function Dashboard() {
       return isScheduled && appointmentDate >= today
     }).length
 
-    // Calcul des contrats
     const signedContracts = contracts.filter((contract) => contract.status === "signed").length
     const sentContracts = contracts.filter(
       (contract) => contract.status === "sent" || contract.status === "contrat_envoye"
@@ -172,7 +160,6 @@ export function Dashboard() {
         org.region?.toLowerCase() === zone.toLowerCase()
       )
       
-      // Calculer les appointments et contrats pour cette zone
       const zoneAppointments = appointments.filter(apt => 
         zoneOrgs.some(org => org.id === apt.organizationId)
       )
@@ -192,7 +179,7 @@ export function Dashboard() {
       }
     })
 
-    // Ajouter les organisations sans zone définie
+    // Organisations sans zone définie
     const orgsWithoutZone = orgs.filter(org => 
       (!org.zone_geographique && !org.region) || 
       (!zones.map(z => z.toLowerCase()).includes(org.zone_geographique?.toLowerCase() || '') &&
@@ -222,58 +209,67 @@ export function Dashboard() {
   }
 
   const calculateDistrictGroups = (orgs: Organization[], appointments: any[], contracts: any[]) => {
-    const districtMap = new Map<string, DistrictGroup>()
-
     console.log("[Dashboard] Calculating districts for", orgs.length, "organizations")
     
-    // Debug: Vérifier quelques organisations pour voir leurs champs district et region
-    orgs.slice(0, 3).forEach((org, index) => {
-      console.log(`[Dashboard] Org ${index}:`, {
-        name: org.name,
-        district: org.district,
-        region: org.region,
-        zone_geographique: org.zone_geographique
+    // Récupérer tous les districts uniques (même logique que les zones)
+    const allDistricts = [...new Set(
+      orgs
+        .map(org => org.district?.trim())
+        .filter(district => district && district.length > 0)
+    )]
+    
+    console.log("[Dashboard] Unique districts found:", allDistricts)
+    
+    const groups: DistrictGroup[] = []
+
+    // Appliquer exactement la même logique que pour les zones géographiques
+    allDistricts.forEach(district => {
+      const districtOrgs = orgs.filter(org => 
+        org.district?.toLowerCase() === district.toLowerCase()
+      )
+      
+      const districtAppointments = appointments.filter(apt => 
+        districtOrgs.some(org => org.id === apt.organizationId)
+      )
+      const districtContracts = contracts.filter(contract => 
+        districtOrgs.some(org => org.id === contract.organizationId)
+      )
+
+      groups.push({
+        district,
+        count: districtOrgs.length,
+        organizations: districtOrgs,
+        zone: districtOrgs[0]?.zone_geographique, // Zone de la première org du district
+        appointmentCount: districtAppointments.length,
+        contractCount: districtContracts.length
       })
     })
 
-    orgs.forEach(org => {
-      // Récupérer le district depuis district OU region (les deux peuvent contenir l'info district)
-      const district = (org.district?.trim() || org.region?.trim() || 'Non défini')
-      
-      if (districtMap.has(district)) {
-        const existing = districtMap.get(district)!
-        existing.count += 1
-        existing.organizations.push(org)
-      } else {
-        districtMap.set(district, {
-          district,
-          count: 1,
-          organizations: [org],
-          zone: org.zone_geographique, // Zone géographique séparée
-          appointmentCount: 0,
-          contractCount: 0
-        })
-      }
-    })
-
-    console.log("[Dashboard] Districts found:", Array.from(districtMap.keys()))
-
-    // Calculer les appointments et contrats pour chaque district
-    districtMap.forEach((group, district) => {
+    // Ajouter les organisations sans district défini
+    const orgsWithoutDistrict = orgs.filter(org => 
+      !org.district || org.district.trim().length === 0
+    )
+    
+    if (orgsWithoutDistrict.length > 0) {
       const districtAppointments = appointments.filter(apt => 
-        group.organizations.some(org => org.id === apt.organizationId)
+        orgsWithoutDistrict.some(org => org.id === apt.organizationId)
       )
       const districtContracts = contracts.filter(contract => 
-        group.organizations.some(org => org.id === contract.organizationId)
+        orgsWithoutDistrict.some(org => org.id === contract.organizationId)
       )
-      
-      group.appointmentCount = districtAppointments.length
-      group.contractCount = districtContracts.length
-    })
 
-    const groups = Array.from(districtMap.values())
-    console.log("[Dashboard] District groups created:", groups.length)
+      groups.push({
+        district: 'Non défini',
+        count: orgsWithoutDistrict.length,
+        organizations: orgsWithoutDistrict,
+        appointmentCount: districtAppointments.length,
+        contractCount: districtContracts.length
+      })
+    }
+
     groups.sort((a, b) => b.count - a.count)
+    console.log("[Dashboard] District groups created:", groups.length, "groups")
+    console.log("[Dashboard] District names:", groups.map(g => g.district))
     setDistrictGroups(groups)
   }
 
@@ -290,8 +286,10 @@ export function Dashboard() {
         break
       case "district":
         filteredOrganizations = organizations.filter(org => {
-          const orgDistrict = org.district?.trim() || org.region?.trim() || 'Non défini'
-          return orgDistrict === name
+          if (name === 'Non défini') {
+            return !org.district || org.district.trim().length === 0
+          }
+          return org.district?.toLowerCase() === name.toLowerCase()
         })
         break
     }
@@ -529,28 +527,24 @@ export function Dashboard() {
             </TabsContent>
 
             <TabsContent value="districts" className="mt-6">
-              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h4 className="font-bold text-sm text-yellow-800">DEBUG Info:</h4>
-                <p className="text-xs text-yellow-700">
-                  Total organisations: {organizations.length} | 
-                  Districts trouvés: {districtGroups.length} | 
-                  Ouvrez la console (F12) pour voir le détail complet
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-bold text-sm text-blue-800">Répartition par Districts</h4>
+                <p className="text-xs text-blue-700">
+                  {districtGroups.length} district{districtGroups.length > 1 ? 's' : ''} identifié{districtGroups.length > 1 ? 's' : ''} 
+                  avec {organizations.length} organisations au total
                 </p>
-                {districtGroups.length > 0 && (
-                  <p className="text-xs text-yellow-700 mt-1">
-                    Districts: {districtGroups.map(d => d.district).join(', ')}
-                  </p>
-                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {districtGroups.length === 0 ? (
                   <div className="col-span-full text-center p-8 text-gray-500">
                     <p>Aucun district trouvé</p>
-                    <p className="text-sm mt-2">Vérifiez la console pour voir les données récupérées</p>
+                    <p className="text-sm mt-2">
+                      Les organisations n'ont pas de données dans le champ "district"
+                    </p>
                   </div>
                 ) : (
-                  districtGroups.slice(0, 16).map((group) => (
+                  districtGroups.map((group) => (
                     <div
                       key={group.district}
                       className="p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors border-l-4 border-l-cyan-500"
@@ -600,14 +594,6 @@ export function Dashboard() {
                   ))
                 )}
               </div>
-              
-              {districtGroups.length > 16 && (
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-500">
-                    Et {districtGroups.length - 16} autres districts...
-                  </p>
-                </div>
-              )}
             </TabsContent>
           </Tabs>
         </CardContent>
