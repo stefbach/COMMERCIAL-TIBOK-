@@ -67,11 +67,13 @@ export class SupabaseClientDB {
     }
   }
 
-  // Organizations
+  // ============================================
+  // ORGANIZATIONS - Fonctions complètement corrigées
+  // ============================================
+
   static async getOrganizations(): Promise<Organization[]> {
     console.log("[v0] Loading organizations...")
 
-    // Check if we should use demo mode
     if (await this.isDemoMode()) {
       console.log("[v0] Using demo mode for organizations")
       const demoOrgs = this.getDemoData("organizations")
@@ -104,33 +106,29 @@ export class SupabaseClientDB {
   static async createOrganization(orgData: Partial<Organization>): Promise<Organization> {
     console.log("[v0] Creating organization:", orgData.name)
 
-    // Check demo mode first
     if (await this.isDemoMode()) {
       console.log("[v0] Using demo mode for organization creation")
       const newOrg: Organization = {
-        id: parseInt(this.generateId()),
+        id: this.generateId(),
         name: orgData.name || "",
-        industry: orgData.industry || "",
-        category: orgData.category || "",
-        region: orgData.region || "",
-        zone_geographique: orgData.zone_geographique || "",
-        district: orgData.district || "",
-        city: orgData.city || "",
-        address: orgData.address || "",
-        secteur: orgData.secteur || "",
-        website: orgData.website || "",
-        nb_chambres: orgData.nb_chambres || 0,
-        phone: orgData.phone || "",
-        email: orgData.email || "",
-        notes: orgData.notes || "",
-        contact_principal: orgData.contact_principal || "",
-        contact_fonction: orgData.contact_fonction || "",
-        size: orgData.size || "",
-        country: orgData.country || "Maurice",
-        status: orgData.status || "Actif",
-        priority: orgData.priority || "Moyenne",
+        industry: orgData.industry || undefined,
+        category: orgData.category || undefined,
+        region: orgData.region || undefined,
+        zone_geographique: orgData.zone_geographique || undefined,
+        district: orgData.district || undefined,
+        city: orgData.city || undefined,
+        address: orgData.address || undefined,
+        secteur: orgData.secteur || undefined,
+        website: orgData.website || undefined,
+        nb_chambres: orgData.nb_chambres || undefined,
+        phone: orgData.phone || undefined,
+        email: orgData.email || undefined,
+        notes: orgData.notes || undefined,
+        contact_principal: orgData.contact_principal || undefined,
+        status: orgData.status || "prospect",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        // Champ temporaire pour compatibilité d'affichage
         activityType: orgData.industry || "",
       }
       const organizations = this.getDemoData("organizations")
@@ -139,33 +137,30 @@ export class SupabaseClientDB {
       return newOrg
     }
 
-    // Try Supabase
     try {
       const supabase = this.getClient()
 
-      const supabaseData = {
+      // Préparer les données pour Supabase - SEULEMENT les champs existants
+      const supabaseData: any = {
         name: orgData.name || "",
-        industry: orgData.industry || "",
-        category: orgData.category || "",
-        region: orgData.region || "",
-        zone_geographique: orgData.zone_geographique || "",
-        district: orgData.district || "",
-        city: orgData.city || "",
-        address: orgData.address || "",
-        secteur: orgData.secteur || "",
-        website: orgData.website || "",
-        nb_chambres: orgData.nb_chambres || 0,
-        phone: orgData.phone || "",
-        email: orgData.email || "",
-        notes: orgData.notes || "",
-        contact_principal: orgData.contact_principal || "",
-        contact_fonction: orgData.contact_fonction || "",
-        size: orgData.size || "",
-        country: orgData.country || "Maurice",
-        status: orgData.status || "Actif",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       }
+
+      // Ajouter seulement les champs non-vides qui existent dans la table
+      if (orgData.industry?.trim()) supabaseData.industry = orgData.industry.trim()
+      if (orgData.category?.trim()) supabaseData.category = orgData.category.trim()
+      if (orgData.region?.trim()) supabaseData.region = orgData.region.trim()
+      if (orgData.zone_geographique?.trim()) supabaseData.zone_geographique = orgData.zone_geographique.trim()
+      if (orgData.district?.trim()) supabaseData.district = orgData.district.trim()
+      if (orgData.city?.trim()) supabaseData.city = orgData.city.trim()
+      if (orgData.address?.trim()) supabaseData.address = orgData.address.trim()
+      if (orgData.secteur?.trim()) supabaseData.secteur = orgData.secteur.trim()
+      if (orgData.website?.trim()) supabaseData.website = orgData.website.trim()
+      if (orgData.nb_chambres) supabaseData.nb_chambres = orgData.nb_chambres
+      if (orgData.phone?.trim()) supabaseData.phone = orgData.phone.trim()
+      if (orgData.email?.trim()) supabaseData.email = orgData.email.trim()
+      if (orgData.contact_principal?.trim()) supabaseData.contact_principal = orgData.contact_principal.trim()
+      if (orgData.notes?.trim()) supabaseData.notes = orgData.notes.trim()
+      if (orgData.status) supabaseData.status = orgData.status
 
       const { data, error } = await supabase.from("organizations").insert([supabaseData]).select().single()
 
@@ -175,14 +170,14 @@ export class SupabaseClientDB {
       }
 
       console.log("[v0] Organization successfully created in Supabase")
-      return { ...data, priority: orgData.priority || "Moyenne", activityType: data.industry } as Organization
+      return { ...data, activityType: data.industry } as Organization
     } catch (error) {
       console.log("[v0] Supabase creation failed:", error)
       throw error
     }
   }
 
-  static async updateOrganization(id: number, updates: Partial<Organization>): Promise<Organization> {
+  static async updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization> {
     if (await this.isDemoMode()) {
       const organizations = this.getDemoData("organizations")
       const index = organizations.findIndex((org: Organization) => org.id === id)
@@ -194,14 +189,33 @@ export class SupabaseClientDB {
       throw new Error("Organization not found")
     }
 
+    // Filtrer pour ne garder que les champs qui existent dans la table
+    const allowedFields = [
+      'name', 'industry', 'website', 'phone', 'email', 'address', 'city', 'status',
+      'notes', 'category', 'district', 'contact_principal', 'region', 'zone_geographique',
+      'secteur', 'nb_chambres'
+    ]
+
+    const filteredUpdates: any = {}
+    Object.keys(updates).forEach(key => {
+      if (allowedFields.includes(key) && updates[key] !== undefined) {
+        filteredUpdates[key] = updates[key]
+      }
+    })
+
     const supabase = this.getClient()
-    const { data, error } = await supabase.from("organizations").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id).select().single()
+    const { data, error } = await supabase
+      .from("organizations")
+      .update({ ...filteredUpdates, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single()
 
     if (error) throw error
     return data
   }
 
-  static async deleteOrganization(id: number): Promise<void> {
+  static async deleteOrganization(id: string): Promise<void> {
     if (await this.isDemoMode()) {
       const organizations = this.getDemoData("organizations")
       const filtered = organizations.filter((org: Organization) => org.id !== id)
@@ -215,7 +229,10 @@ export class SupabaseClientDB {
     if (error) throw error
   }
 
-  // Contacts
+  // ============================================
+  // CONTACTS
+  // ============================================
+
   static async getContacts(): Promise<Contact[]> {
     if (await this.isDemoMode()) {
       return this.getDemoData("contacts")
@@ -247,7 +264,7 @@ export class SupabaseClientDB {
     return data
   }
 
-  static async getContactsByOrganization(organizationId: number): Promise<Contact[]> {
+  static async getContactsByOrganization(organizationId: string): Promise<Contact[]> {
     if (await this.isDemoMode()) {
       const contacts = this.getDemoData("contacts")
       return contacts.filter((contact: Contact) => contact.organization_id === organizationId)
@@ -294,7 +311,6 @@ export class SupabaseClientDB {
       return data
     } catch (error) {
       console.error("[v0] Supabase update failed, falling back to demo mode:", error)
-      // Fallback to demo mode if Supabase fails
       const contacts = this.getDemoData("contacts")
       const index = contacts.findIndex((contact: Contact) => contact.id === id)
       if (index !== -1) {
@@ -320,7 +336,10 @@ export class SupabaseClientDB {
     if (error) throw error
   }
 
-  // Deals
+  // ============================================
+  // DEALS
+  // ============================================
+
   static async getDeals(): Promise<Deal[]> {
     if (await this.isDemoMode()) {
       return this.getDemoData("deals")
@@ -402,7 +421,10 @@ export class SupabaseClientDB {
     if (error) throw error
   }
 
-  // Activities
+  // ============================================
+  // ACTIVITIES
+  // ============================================
+
   static async getActivities(): Promise<Activity[]> {
     if (await this.isDemoMode()) {
       return this.getDemoData("activities")
@@ -486,7 +508,10 @@ export class SupabaseClientDB {
     if (error) throw error
   }
 
-  // Appointments
+  // ============================================
+  // APPOINTMENTS
+  // ============================================
+
   static async getAppointments(): Promise<any[]> {
     console.log("[v0] getAppointments called")
 
@@ -545,7 +570,6 @@ export class SupabaseClientDB {
     if (await this.isDemoMode()) {
       console.log("[v0] Demo mode for appointments loading: true")
       const appointments = this.getDemoData("appointments")
-      console.log("[v0] Raw appointments data:", appointments)
       const filtered = appointments.filter((appointment: Appointment) => appointment.organization_id === organizationId)
       console.log("[v0] Filtered appointments:", filtered.length)
       return filtered
@@ -567,7 +591,6 @@ export class SupabaseClientDB {
       if (!data || data.length === 0) {
         console.log("[v0] Supabase returned empty data, checking localStorage fallback")
         const appointments = this.getDemoData("appointments")
-        console.log("[v0] Fallback appointments data:", appointments)
         const filtered = appointments.filter(
           (appointment: Appointment) => appointment.organization_id === organizationId,
         )
@@ -579,7 +602,6 @@ export class SupabaseClientDB {
     } catch (error) {
       console.log("[v0] Supabase appointments failed, falling back to demo mode:", error)
       const appointments = this.getDemoData("appointments")
-      console.log("[v0] Fallback appointments data:", appointments)
       const filtered = appointments.filter((appointment: Appointment) => appointment.organization_id === organizationId)
       console.log("[v0] Fallback appointments loaded:", filtered.length)
       return filtered
@@ -732,7 +754,10 @@ export class SupabaseClientDB {
     }
   }
 
-  // Contracts
+  // ============================================
+  // CONTRACTS
+  // ============================================
+
   static async getContracts(): Promise<Contract[]> {
     if (await this.isDemoMode()) {
       return this.getDemoData("contracts")
@@ -894,7 +919,10 @@ export class SupabaseClientDB {
     return data || []
   }
 
-  // CRM Documents
+  // ============================================
+  // CRM DOCUMENTS (inchangées)
+  // ============================================
+
   static async getCRMDocuments(): Promise<CRMDocument[]> {
     console.log("[v0] Loading CRM documents...")
 
@@ -1170,7 +1198,10 @@ export class SupabaseClientDB {
     }
   }
 
-  // User Management
+  // ============================================
+  // USER MANAGEMENT (inchangées)
+  // ============================================
+
   static async getAdmins(): Promise<any[]> {
     if (await this.isDemoMode()) {
       return this.getDemoData("admins")
@@ -1289,7 +1320,10 @@ export class SupabaseClientDB {
     if (error) throw error
   }
 
-  // Demo data storage and retrieval functions
+  // ============================================
+  // DEMO DATA - Données corrigées SANS les champs supprimés
+  // ============================================
+
   private static getDemoData(key: string) {
     if (typeof window === "undefined") return []
     const data = localStorage.getItem(`demo_${key}`)
@@ -1315,334 +1349,156 @@ export class SupabaseClientDB {
       case "organizations":
         return [
           {
-            id: 1,
-            name: "Hôtel Le Grand Palace",
+            id: "demo-org-1",
+            name: "Hôtel Le Grand Mauricien",
             industry: "Hôtellerie",
-            activityType: "Hôtel",
-            size: "Grande entreprise",
-            website: "https://legrandpalace.com",
-            email: "contact@legrandpalace.com",
-            phone: "+33 1 23 45 67 89",
-            address: "123 Avenue des Champs-Élysées",
-            city: "Paris",
-            region: "Île-de-France",
-            country: "France",
-            status: "Actif",
-            priority: "Haute",
-            notes: "Client premium avec 200 chambres",
+            category: "4 étoiles",
+            region: "Ouest",
+            zone_geographique: "Côte ouest",
+            district: "Port Louis",
+            city: "Port Louis",
+            address: "123 Royal Street, Port Louis",
+            secteur: "Tourisme",
+            website: "https://legrandmauricien.mu",
+            nb_chambres: 120,
+            phone: "+230 123 4567",
+            email: "contact@legrandmauricien.mu",
+            contact_principal: "Marie Lagesse",
+            notes: "Hôtel de luxe au centre-ville avec vue sur le port",
+            status: "active",
             created_at: "2024-01-15T10:00:00Z",
             updated_at: "2024-01-15T10:00:00Z",
+            activityType: "Hôtellerie",
           },
           {
-            id: 2,
-            name: "Pharmacie Central",
-            industry: "Santé",
-            activityType: "Pharmacie",
-            size: "PME",
-            website: "https://pharmaciecentral.fr",
-            email: "info@pharmaciecentral.fr",
-            phone: "+33 1 98 76 54 32",
-            address: "45 Rue de la République",
-            city: "Lyon",
-            region: "Auvergne-Rhône-Alpes",
-            country: "France",
-            status: "Prospect",
-            priority: "Moyenne",
-            notes: "Pharmacie familiale depuis 1950",
+            id: "demo-org-2",
+            name: "Resort Tropical Paradise",
+            industry: "Hôtellerie",
+            category: "5 étoiles",
+            region: "Nord",
+            zone_geographique: "Grand Baie",
+            district: "Rivière du Rempart",
+            city: "Grand Baie",
+            address: "456 Coastal Road, Grand Baie",
+            secteur: "Tourisme",
+            website: "https://tropicalparadise.mu",
+            nb_chambres: 200,
+            phone: "+230 987 6543",
+            email: "info@tropicalparadise.mu",
+            contact_principal: "Jean Dupont",
+            notes: "Resort de luxe en bord de mer avec spa",
+            status: "prospect",
             created_at: "2024-01-20T14:30:00Z",
             updated_at: "2024-01-20T14:30:00Z",
+            activityType: "Hôtellerie",
           },
         ]
 
       case "contacts":
         return [
           {
-            id: "1",
-            organization_id: 1,
-            fullName: "Marie Dubois",
+            id: "demo-contact-1",
+            organization_id: "demo-org-1",
+            fullName: "Marie Lagesse",
             role: "Directrice Générale",
-            email: "marie.dubois@legrandpalace.com",
-            phone: "01 42 56 78 90",
-            mobilePhone: "06 12 34 56 78",
-            linkedinProfile: "https://linkedin.com/in/marie-dubois",
+            email: "marie.lagesse@legrandmauricien.mu",
+            phone: "+230 123 4567",
+            mobilePhone: "+230 5123 4567",
             consentMarketing: true,
-            notes: "Très intéressée par nos solutions. Préfère les rendez-vous en matinée.",
+            notes: "Très intéressée par nos solutions CRM",
             lastContactDate: "2024-03-01T10:00:00Z",
             nextFollowUpDate: "2024-03-15T10:00:00Z",
             appointmentHistory: [],
             prospectStatus: "hot",
-            priority: "high",
             source: "Référence",
             created_at: "2024-02-15T10:00:00Z",
             updated_at: "2024-03-01T10:00:00Z",
-          },
-          {
-            id: "2",
-            organization_id: 2,
-            fullName: "Pierre Martin",
-            role: "Pharmacien Titulaire",
-            email: "pierre.martin@pharmaciecentral.fr",
-            phone: "04 78 90 12 34",
-            mobilePhone: "06 98 76 54 32",
-            consentMarketing: true,
-            notes: "Demande plus d'informations sur les tarifs.",
-            lastContactDate: "2024-02-28T10:00:00Z",
-            nextFollowUpDate: "2024-03-10T10:00:00Z",
-            appointmentHistory: [],
-            prospectStatus: "cold",
-            priority: "medium",
-            source: "Site web",
-            created_at: "2024-02-20T10:00:00Z",
-            updated_at: "2024-02-28T10:00:00Z",
           },
         ]
 
       case "appointments":
         return [
           {
-            id: "z9fr8aj0e",
-            organization_id: "1",
-            contact_id: "1",
+            id: "demo-apt-1",
+            organization_id: "demo-org-1",
             title: "Présentation solution CRM",
             description: "Démonstration des fonctionnalités principales",
             appointment_date: "2024-03-15",
             appointment_time: "10:00",
             duration: 60,
-            location: "Hôtel Le Grand Palace",
-            city: "Paris",
-            region: "Île-de-France",
-            address: "123 Avenue des Champs-Élysées",
+            location: "Hôtel Le Grand Mauricien",
             type: "Meeting",
             status: "Scheduled",
             reminder: true,
             created_at: "2024-03-01T10:00:00Z",
             updated_at: "2024-03-01T10:00:00Z",
           },
+        ]
+
+      case "contracts":
+        return [
           {
-            id: "7d3o9kq7c",
-            organization_id: "2",
-            contact_id: "2",
-            title: "Appel de suivi",
-            description: "Discussion sur les besoins spécifiques",
-            appointment_date: "2024-03-12",
-            appointment_time: "14:30",
-            duration: 30,
-            location: "Téléphone",
-            city: "Lyon",
-            region: "Auvergne-Rhône-Alpes",
-            type: "Call",
-            status: "Scheduled",
-            reminder: true,
-            created_at: "2024-03-05T10:00:00Z",
-            updated_at: "2024-03-05T10:00:00Z",
+            id: "demo-contract-1",
+            organizationId: "demo-org-1",
+            title: "Contrat CRM Hôtel Le Grand Mauricien",
+            description: "Solution CRM complète pour la gestion hôtelière",
+            value: 15000,
+            currency: "MUR",
+            status: "envoye",
+            assignedTo: "Marie Lagesse",
+            createdDate: new Date("2024-03-01"),
+            updatedDate: new Date("2024-03-01"),
+            documents: [],
+            notes: "Contrat envoyé suite à la démonstration",
           },
         ]
 
       case "deals":
         return [
           {
-            id: "deal_001",
-            organization_id: 1,
-            contact_id: "1",
-            title: "CRM Solution - Hôtel Le Grand Palace",
+            id: "demo-deal-1",
+            organizationId: "demo-org-1",
+            title: "CRM Solution - Hôtel Le Grand Mauricien",
             description: "Implémentation complète du système CRM",
             value: 25000,
-            currency: "EUR",
+            currency: "MUR",
             stage: "proposal",
             probability: 75,
             expected_close_date: "2024-04-15",
             created_at: "2024-03-01T10:00:00Z",
             updated_at: "2024-03-01T10:00:00Z",
           },
-          {
-            id: "deal_002",
-            organization_id: 2,
-            contact_id: "2",
-            title: "CRM Solution - Pharmacie Central",
-            description: "Solution CRM adaptée aux pharmacies",
-            value: 12000,
-            currency: "EUR",
-            stage: "qualification",
-            probability: 50,
-            expected_close_date: "2024-05-01",
-            created_at: "2024-02-28T10:00:00Z",
-            updated_at: "2024-02-28T10:00:00Z",
-          },
         ]
 
-      case "contracts":
-        return [
-          {
-            id: "contract_001",
-            organizationId: 1,
-            contactId: "1",
-            title: "Contrat CRM Hôtel Le Grand Palace",
-            description: "Solution CRM complète pour la gestion des clients et réservations",
-            value: 15000,
-            currency: "EUR",
-            status: "sent",
-            signedDate: undefined,
-            expirationDate: new Date("2024-06-15"),
-            assignedTo: "Jean Dupont",
-            createdDate: new Date("2024-03-01"),
-            updatedDate: new Date("2024-03-01"),
-            documents: [],
-            notes: "Contrat envoyé suite à la démonstration. En attente de signature.",
-          },
-          {
-            id: "contract_002",
-            organizationId: 2,
-            contactId: "2",
-            title: "Contrat CRM Pharmacie Central",
-            description: "Solution CRM adaptée aux pharmacies avec gestion des stocks",
-            value: 8500,
-            currency: "EUR",
-            status: "draft",
-            signedDate: undefined,
-            expirationDate: new Date("2024-05-30"),
-            assignedTo: "Sophie Martin",
-            createdDate: new Date("2024-02-28"),
-            updatedDate: new Date("2024-03-05"),
-            documents: [],
-            notes: "Contrat en préparation. Attente des spécifications techniques.",
-          },
-        ]
+      case "activities":
+        return []
 
       case "crm_documents":
         return [
           {
-            id: "doc_001",
-            title: "Présentation Télémédecine Globale",
-            description: "Vue d'ensemble de la télémédecine dans le monde - Statistiques et tendances 2024",
-            file_name: "telemedecine_monde_2024.pdf",
-            file_path: "demo/telemedecine_monde_2024.pdf",
+            id: "demo-doc-1",
+            title: "Présentation CRM Hôtellerie Maurice",
+            description: "Présentation commerciale adaptée au secteur hôtelier mauricien",
+            file_name: "crm_hotels_maurice.pdf",
+            file_path: "demo/crm_hotels_maurice.pdf",
             file_size: 2850000,
             mime_type: "application/pdf",
             category: "presentation_commerciale",
-            sub_category: "telemedecine_monde",
+            sub_category: "hotel",
             version: 1,
             is_active: true,
             uploaded_by: "demo-user",
             created_at: "2024-01-15T10:00:00Z",
             updated_at: "2024-01-15T10:00:00Z"
           },
-          {
-            id: "doc_002",
-            title: "Solution CRM pour Hôtels de Luxe",
-            description: "Présentation commerciale adaptée au secteur hôtelier premium",
-            file_name: "crm_hotels_luxe.pdf",
-            file_path: "demo/crm_hotels_luxe.pdf",
-            file_size: 1950000,
-            mime_type: "application/pdf",
-            category: "presentation_commerciale",
-            sub_category: "hotel",
-            version: 2,
-            is_active: true,
-            uploaded_by: "demo-user",
-            created_at: "2024-01-20T14:30:00Z",
-            updated_at: "2024-02-15T09:20:00Z"
-          },
-          {
-            id: "doc_003",
-            title: "CRM pour Pharmacies - Présentation",
-            description: "Solution spécialisée pour la gestion des pharmacies",
-            file_name: "crm_pharmacies.pdf",
-            file_path: "demo/crm_pharmacies.pdf",
-            file_size: 1650000,
-            mime_type: "application/pdf",
-            category: "presentation_commerciale",
-            sub_category: "pharmacie",
-            version: 1,
-            is_active: true,
-            uploaded_by: "demo-user",
-            created_at: "2024-02-01T11:15:00Z",
-            updated_at: "2024-02-01T11:15:00Z"
-          },
-          {
-            id: "doc_004",
-            title: "Solutions Entreprise B2B",
-            description: "Présentation des solutions CRM pour les entreprises",
-            file_name: "crm_entreprises.pdf",
-            file_path: "demo/crm_entreprises.pdf",
-            file_size: 2100000,
-            mime_type: "application/pdf",
-            category: "presentation_commerciale",
-            sub_category: "entreprise",
-            version: 1,
-            is_active: true,
-            uploaded_by: "demo-user",
-            created_at: "2024-02-10T16:45:00Z",
-            updated_at: "2024-02-10T16:45:00Z"
-          },
-          {
-            id: "doc_005",
-            title: "CRM Maisons de Retraite",
-            description: "Solution adaptée aux établissements pour seniors",
-            file_name: "crm_maisons_retraite.pdf",
-            file_path: "demo/crm_maisons_retraite.pdf",
-            file_size: 1750000,
-            mime_type: "application/pdf",
-            category: "presentation_commerciale",
-            sub_category: "maison_retraite",
-            version: 1,
-            is_active: true,
-            uploaded_by: "demo-user",
-            created_at: "2024-02-05T13:20:00Z",
-            updated_at: "2024-02-05T13:20:00Z"
-          },
-          {
-            id: "doc_006",
-            title: "Contrat Standard CRM Premium",
-            description: "Modèle de contrat pour solutions CRM premium",
-            file_name: "contrat_crm_premium.docx",
-            file_path: "demo/contrat_crm_premium.docx",
-            file_size: 125000,
-            mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            category: "contrat",
-            version: 3,
-            is_active: true,
-            uploaded_by: "demo-user",
-            created_at: "2024-01-10T08:30:00Z",
-            updated_at: "2024-02-20T14:10:00Z"
-          },
-          {
-            id: "doc_007",
-            title: "Contrat Secteur Santé",
-            description: "Contrat spécialisé pour pharmacies et établissements de santé",
-            file_name: "contrat_sante.docx",
-            file_path: "demo/contrat_sante.docx",
-            file_size: 98000,
-            mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            category: "contrat",
-            version: 1,
-            is_active: true,
-            uploaded_by: "demo-user",
-            created_at: "2024-02-15T10:45:00Z",
-            updated_at: "2024-02-15T10:45:00Z"
-          },
-          {
-            id: "doc_008",
-            title: "Contrat Hôtellerie",
-            description: "Contrat adapté au secteur hôtelier et de l'hospitalité",
-            file_name: "contrat_hotellerie.docx",
-            file_path: "demo/contrat_hotellerie.docx",
-            file_size: 110000,
-            mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            category: "contrat",
-            version: 2,
-            is_active: true,
-            uploaded_by: "demo-user",
-            created_at: "2024-01-25T15:20:00Z",
-            updated_at: "2024-02-18T11:30:00Z"
-          }
         ]
 
       case "admins":
         return [
           {
-            id: "admin1",
-            user_id: "user1",
-            email: "admin@crm.com",
+            id: "demo-admin-1",
+            user_id: "demo-user-1",
+            email: "admin@crm.mu",
             full_name: "Administrateur Principal",
             created_at: "2024-01-01T00:00:00Z",
             updated_at: "2024-01-01T00:00:00Z",
@@ -1652,22 +1508,12 @@ export class SupabaseClientDB {
       case "commerciaux":
         return [
           {
-            id: "comm1",
-            email: "marie.dupont@crm.com",
-            full_name: "Marie Dupont",
-            phone: "+33 6 12 34 56 78",
-            region: "Île-de-France",
-            notes: "Spécialisée dans l'hôtellerie de luxe",
-            created_at: "2024-01-05T00:00:00Z",
-            updated_at: "2024-01-05T00:00:00Z",
-          },
-          {
-            id: "comm2",
-            email: "jean.martin@crm.com",
-            full_name: "Jean Martin",
-            phone: "+33 6 98 76 54 32",
-            region: "Auvergne-Rhône-Alpes",
-            notes: "Expert en pharmacies et établissements de santé",
+            id: "demo-comm-1",
+            email: "marie.commercial@crm.mu",
+            full_name: "Marie Commercial",
+            phone: "+230 5123 4567",
+            region: "Nord",
+            notes: "Spécialisée dans l'hôtellerie de luxe à Maurice",
             created_at: "2024-01-05T00:00:00Z",
             updated_at: "2024-01-05T00:00:00Z",
           },
@@ -1678,7 +1524,7 @@ export class SupabaseClientDB {
     }
   }
 
-  private static generateId() {
+  private static generateId(): string {
     return Math.random().toString(36).substr(2, 9)
   }
 }
@@ -1695,7 +1541,8 @@ function initializeDemoData() {
     "deals", 
     "appointments", 
     "contracts",
-    "crm_documents" // Ajout des documents CRM
+    "crm_documents",
+    "activities"
   ]
   
   dataTypes.forEach(type => {
