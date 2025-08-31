@@ -154,7 +154,10 @@ export function Dashboard() {
     const groups: GeographicalGroup[] = []
 
     zones.forEach(zone => {
-      const zoneOrgs = orgs.filter(org => org.region?.toLowerCase() === zone.toLowerCase())
+      const zoneOrgs = orgs.filter(org => 
+        org.zone_geographique?.toLowerCase() === zone.toLowerCase() || 
+        org.region?.toLowerCase() === zone.toLowerCase()
+      )
       
       // Calculer les appointments et contrats pour cette zone
       const zoneAppointments = appointments.filter(apt => 
@@ -178,7 +181,9 @@ export function Dashboard() {
 
     // Ajouter les organisations sans zone définie
     const orgsWithoutZone = orgs.filter(org => 
-      !org.region || !zones.map(z => z.toLowerCase()).includes(org.region.toLowerCase())
+      (!org.zone_geographique && !org.region) || 
+      (!zones.map(z => z.toLowerCase()).includes(org.zone_geographique?.toLowerCase() || '') &&
+       !zones.map(z => z.toLowerCase()).includes(org.region?.toLowerCase() || ''))
     )
     
     if (orgsWithoutZone.length > 0) {
@@ -218,7 +223,7 @@ export function Dashboard() {
           district,
           count: 1,
           organizations: [org],
-          zone: org.region,
+          zone: org.zone_geographique || org.region,
           appointmentCount: 0,
           contractCount: 0
         })
@@ -248,10 +253,11 @@ export function Dashboard() {
 
     switch (type) {
       case "geographical":
-        filteredOrganizations = organizations.filter(org => 
-          org.region?.toLowerCase() === name.toLowerCase() ||
-          (name === 'Non définie' && (!org.region || !['nord', 'sud', 'est', 'ouest', 'centre'].includes(org.region.toLowerCase())))
-        )
+        filteredOrganizations = organizations.filter(org => {
+          const orgZone = org.zone_geographique || org.region
+          return orgZone?.toLowerCase() === name.toLowerCase() ||
+            (name === 'Non définie' && !orgZone)
+        })
         break
       case "district":
         filteredOrganizations = organizations.filter(org => 
@@ -594,7 +600,7 @@ export function Dashboard() {
                         <div className="flex-1">
                           <h5 className="font-medium">{org.name}</h5>
                           <p className="text-sm text-muted-foreground">
-                            {org.district} - {org.region}
+                            {org.district} - {org.zone_geographique || org.region}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {org.nb_chambres && `${org.nb_chambres} chambres`}
