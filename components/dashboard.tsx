@@ -140,10 +140,22 @@ export function Dashboard() {
       return isScheduled && appointmentDate >= today
     }).length
 
-    const signedContracts = contracts.filter((contract) => contract.status === "signed").length
-    const sentContracts = contracts.filter(
-      (contract) => contract.status === "sent" || contract.status === "contrat_envoye"
-    ).length
+    // ✅ CORRECTION : Reconnaître les statuts français ET anglais
+    const signedContracts = contracts.filter((contract) => {
+      const status = contract.status?.toLowerCase()
+      return status === "signed" || status === "signe"
+    }).length
+
+    const sentContracts = contracts.filter((contract) => {
+      const status = contract.status?.toLowerCase()
+      return status === "sent" || status === "envoye" || status === "contrat_envoye"
+    }).length
+
+    console.log("[DASHBOARD] Contract stats calculation:")
+    console.log("- Total contracts:", contracts.length)
+    console.log("- Contract statuses:", contracts.map(c => c.status))
+    console.log("- Signed contracts found:", signedContracts)
+    console.log("- Sent contracts found:", sentContracts)
 
     setStats({
       totalOrganizations,
@@ -358,12 +370,15 @@ export function Dashboard() {
     }
   }
 
-  // ✅ AJOUT : Fonctions pour les contrats
+  // ✅ CORRECTION : Mettre à jour les fonctions d'affichage des statuts
   const getContractStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
+    const normalizedStatus = status?.toLowerCase()
+    switch (normalizedStatus) {
       case 'signed':
+      case 'signe':
         return 'bg-green-100 text-green-800'
       case 'sent':
+      case 'envoye':
       case 'contrat_envoye':
         return 'bg-blue-100 text-blue-800'
       case 'draft':
@@ -378,15 +393,23 @@ export function Dashboard() {
   }
 
   const getContractStatusLabel = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'signed': return 'Signé'
-      case 'sent': return 'Envoyé'
-      case 'contrat_envoye': return 'Envoyé'
-      case 'draft': return 'Brouillon'
-      case 'brouillon': return 'Brouillon'
-      case 'cancelled': return 'Annulé'
-      case 'annule': return 'Annulé'
-      default: return status || 'Non défini'
+    const normalizedStatus = status?.toLowerCase()
+    switch (normalizedStatus) {
+      case 'signed': 
+      case 'signe': 
+        return 'Signé'
+      case 'sent': 
+      case 'envoye': 
+      case 'contrat_envoye': 
+        return 'Envoyé'
+      case 'draft': 
+      case 'brouillon': 
+        return 'Brouillon'
+      case 'cancelled': 
+      case 'annule': 
+        return 'Annulé'
+      default: 
+        return status || 'Non défini'
     }
   }
 
