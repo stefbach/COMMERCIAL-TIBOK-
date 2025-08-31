@@ -143,7 +143,7 @@ export function Organizations() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showDiagnostic, setShowDiagnostic] = useState(false)
 
-  // Filtres corrigés - SANS priority
+  // Filtres corrigés
   const [filters, setFilters] = useState({
     type: "",
     ville: "",
@@ -164,7 +164,7 @@ export function Organizations() {
       const orgs = await SupabaseClientDB.getOrganizations()
 
       if (orgs.length === 0) {
-        // Données de démo corrigées - SANS priority, size, country, contact_fonction
+        // Données de démo corrigées
         const demoOrgs = [
           {
             id: "demo-1",
@@ -256,12 +256,10 @@ export function Organizations() {
     }
   }
 
-  // Fonction corrigée - SANS priority
   const handleQualifyOrganization = async (org: Organization, newStatus: string) => {
     await handleUpdateOrganization(org, { status: newStatus })
   }
 
-  // Fonction corrigée - SANS priority
   const resetFilters = () => {
     setFilters({
       type: "",
@@ -274,7 +272,7 @@ export function Organizations() {
     })
   }
 
-  // Filtrage corrigé - SANS priority
+  // ✅ CORRECTION PRINCIPALE : Filtrage corrigé pour utiliser zone_geographique
   const filteredOrganizations = organizations.filter((org) => {
     const matchesSearch =
       org.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -289,7 +287,8 @@ export function Organizations() {
       (!filters.secteur || org.secteur?.toLowerCase().includes(filters.secteur.toLowerCase())) &&
       (!filters.district || org.district?.toLowerCase().includes(filters.district.toLowerCase())) &&
       (!filters.categorie || org.category?.toLowerCase().includes(filters.categorie.toLowerCase())) &&
-      (!filters.region || org.region?.toLowerCase() === filters.region.toLowerCase()) &&
+      // ✅ CORRECTION : Utilisation de zone_geographique au lieu de region
+      (!filters.region || org.zone_geographique?.toLowerCase() === filters.region.toLowerCase()) &&
       (!filters.status || org.status?.toLowerCase() === filters.status.toLowerCase())
 
     return matchesSearch && matchesFilters
@@ -299,7 +298,7 @@ export function Organizations() {
     return [...new Set(organizations.map((org) => org[field]).filter(Boolean))] as string[]
   }
 
-  // Fonction d'import corrigée - SANS les champs inexistants
+  // Fonction d'import corrigée
   const handleImportOrganizations = async (data: any[]): Promise<ImportResult> => {
     try {
       let imported = 0
@@ -591,6 +590,7 @@ export function Organizations() {
               </SelectContent>
             </Select>
 
+            {/* ✅ CORRECTION : Le filtre région fonctionne maintenant avec zone_geographique */}
             <Select
               value={filters.region}
               onValueChange={(value) => setFilters((prev) => ({ ...prev, region: value }))}
