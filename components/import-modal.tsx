@@ -29,20 +29,23 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
   const getExpectedFields = () => {
     if (type === "organizations") {
       return [
+        // Champs SEULEMENT de votre table organizations
         { key: "name", label: "Nom", required: true },
-        { key: "industry", label: "Type", required: false },
-        { key: "category", label: "Categorie (etoiles)", required: false },
-        { key: "region", label: "Region", required: false },
-        { key: "zone_geographique", label: "Zone geographique", required: false },
+        { key: "industry", label: "Type/Industrie", required: false },
+        { key: "category", label: "Catégorie (étoiles)", required: false },
+        { key: "region", label: "Région", required: false },
+        { key: "zone_geographique", label: "Zone géographique", required: false },
         { key: "district", label: "District", required: false },
         { key: "city", label: "Ville", required: false },
-        { key: "address", label: "Adresse precise", required: false },
+        { key: "address", label: "Adresse précise", required: false },
         { key: "secteur", label: "Secteur", required: false },
         { key: "website", label: "Site web officiel", required: false },
-        { key: "nb_chambres", label: "Nb de chambres", required: false },
+        { key: "nb_chambres", label: "Nombre de chambres", required: false },
         { key: "phone", label: "Téléphone", required: false },
         { key: "email", label: "Email", required: false },
-        { key: "notes", label: "Commentaires", required: false },
+        { key: "contact_principal", label: "Contact principal", required: false },
+        { key: "notes", label: "Notes/Commentaires", required: false },
+        { key: "status", label: "Statut", required: false },
       ]
     } else {
       return [
@@ -136,45 +139,85 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
       } else if (fileExtension === "xlsx" || fileExtension === "xls") {
         data = await parseExcel(file)
       } else {
-        throw new Error("Unsupported file format. Please use CSV, XLS, or XLSX files.")
+        throw new Error("Format de fichier non supporté. Utilisez des fichiers CSV, XLS ou XLSX.")
       }
 
       if (data.length === 0) {
-        throw new Error("No data found in file or file is empty.")
+        throw new Error("Aucune donnée trouvée dans le fichier ou le fichier est vide.")
       }
 
       console.log("[v0] Parsed data:", data.slice(0, 3))
       setParsedData(data)
 
+      // Mapping automatique intelligent basé sur VOTRE schéma
       const fileColumns = Object.keys(data[0] || {})
       const expectedFields = getExpectedFields()
       const autoMapping: Record<string, string> = {}
 
       expectedFields.forEach((field) => {
-        const matchingColumn = fileColumns.find(
-          (col) =>
-            col.toLowerCase().includes(field.key.toLowerCase()) ||
-            field.label.toLowerCase().includes(col.toLowerCase()) ||
-            (field.key === "name" && (col.includes("nom") || col.includes("name"))) ||
-            (field.key === "industry" && (col.includes("type") || col.includes("activite"))) ||
-            (field.key === "category" && (col.includes("categorie") || col.includes("etoiles"))) ||
-            (field.key === "region" && col.includes("region")) ||
-            (field.key === "zone_geographique" && (col.includes("zone") || col.includes("geographique"))) ||
-            (field.key === "district" && col.includes("district")) ||
-            (field.key === "city" && (col.includes("ville") || col.includes("city"))) ||
-            (field.key === "address" && (col.includes("adresse") || col.includes("address"))) ||
-            (field.key === "secteur" && col.includes("secteur")) ||
-            (field.key === "website" && (col.includes("site") || col.includes("web") || col.includes("website"))) ||
-            (field.key === "nb_chambres" && (col.includes("chambres") || col.includes("rooms"))) ||
-            (field.key === "phone" && (col.includes("tel") || col.includes("phone"))) ||
-            (field.key === "email" && col.includes("email")) ||
-            (field.key === "notes" && (col.includes("commentaires") || col.includes("notes"))),
-        )
+        const matchingColumn = fileColumns.find((col) => {
+          const colLower = col.toLowerCase()
+          const fieldKeyLower = field.key.toLowerCase()
+          
+          // Mappings spécifiques pour votre schéma
+          switch (field.key) {
+            case "name":
+              return colLower.includes("nom") || colLower.includes("name") || 
+                     colLower.includes("etablissement") || colLower === "nom"
+            case "industry":
+              return colLower.includes("type") || colLower.includes("industrie") || 
+                     colLower.includes("activite") || colLower.includes("industry")
+            case "category":
+              return colLower.includes("categorie") || colLower.includes("etoiles") || 
+                     colLower.includes("category") || colLower.includes("stars")
+            case "region":
+              return colLower.includes("region") || colLower === "region"
+            case "zone_geographique":
+              return colLower.includes("zone") && colLower.includes("geographique") ||
+                     colLower.includes("zone_geographique") || colLower.includes("zone")
+            case "district":
+              return colLower.includes("district") || colLower === "district"
+            case "city":
+              return colLower.includes("ville") || colLower.includes("city") || 
+                     colLower === "ville" || colLower === "city"
+            case "address":
+              return colLower.includes("adresse") || colLower.includes("address") || 
+                     colLower.includes("precise") || colLower === "adresse"
+            case "secteur":
+              return colLower.includes("secteur") || colLower === "secteur"
+            case "website":
+              return colLower.includes("site") || colLower.includes("web") || 
+                     colLower.includes("website") || colLower.includes("officiel")
+            case "nb_chambres":
+              return colLower.includes("chambres") || colLower.includes("rooms") || 
+                     colLower.includes("nb") && colLower.includes("chambres")
+            case "phone":
+              return colLower.includes("tel") || colLower.includes("phone") || 
+                     colLower.includes("telephone") || colLower === "tel"
+            case "email":
+              return colLower.includes("email") || colLower.includes("mail") || 
+                     colLower === "email"
+            case "contact_principal":
+              return colLower.includes("contact") && colLower.includes("principal") ||
+                     colLower.includes("contact_principal") || colLower.includes("contact_nom") ||
+                     colLower.includes("contact_name")
+            case "notes":
+              return colLower.includes("commentaires") || colLower.includes("notes") || 
+                     colLower === "notes" || colLower === "commentaires"
+            case "status":
+              return colLower.includes("statut") || colLower.includes("status") || 
+                     colLower === "statut"
+            default:
+              return colLower.includes(fieldKeyLower) || fieldKeyLower.includes(colLower)
+          }
+        })
+        
         if (matchingColumn) {
           autoMapping[field.key] = matchingColumn
         }
       })
 
+      console.log("[v0] Auto mapping:", autoMapping)
       setColumnMapping(autoMapping)
       setStep("mapping")
     } catch (error) {
@@ -197,15 +240,28 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
       const mappedData = parsedData.map((row) => {
         const mappedRow: any = {}
         Object.entries(columnMapping).forEach(([targetField, sourceColumn]) => {
-          if (sourceColumn && sourceColumn !== "" && sourceColumn !== "skip" && row[sourceColumn]) {
-            mappedRow[targetField] = row[sourceColumn]
+          if (sourceColumn && sourceColumn !== "" && sourceColumn !== "skip" && row[sourceColumn] !== undefined) {
+            let value = row[sourceColumn]
+            
+            // Conversion spéciale pour nb_chambres
+            if (targetField === "nb_chambres" && value) {
+              const parsed = parseInt(value.toString().replace(/[^\d]/g, ''))
+              mappedRow[targetField] = isNaN(parsed) ? undefined : parsed
+            } else if (value && value.toString().trim() !== "") {
+              mappedRow[targetField] = value.toString().trim()
+            }
           }
         })
         return mappedRow
       })
 
-      console.log("[v0] Mapped data:", mappedData.slice(0, 3))
-      const importResult = await onImport(mappedData)
+      // Filtrer les lignes vides (sans nom)
+      const validData = mappedData.filter(row => row.name && row.name.trim() !== "")
+
+      console.log("[v0] Mapped data:", validData.slice(0, 3))
+      console.log("[v0] Total valid records:", validData.length)
+      
+      const importResult = await onImport(validData)
       setResult(importResult)
       setStep("result")
     } catch (error) {
@@ -233,15 +289,16 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
 
   const fileColumns = parsedData.length > 0 ? Object.keys(parsedData[0]) : []
   const expectedFields = getExpectedFields()
+  const requiredFieldsMapped = expectedFields.filter(f => f.required).every(f => columnMapping[f.key] && columnMapping[f.key] !== "skip")
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5" />
-            Import {type === "organizations" ? "Organizations" : "Contacts"}
-            {step === "mapping" && " - Column Mapping"}
+            Import {type === "organizations" ? "Organisations" : "Contacts"}
+            {step === "mapping" && " - Mappage des colonnes"}
           </DialogTitle>
         </DialogHeader>
 
@@ -249,10 +306,20 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
           {step === "upload" && (
             <>
               <div>
-                <Label htmlFor="file">Select CSV or Excel file</Label>
+                <Label htmlFor="file">Sélectionnez un fichier CSV ou Excel</Label>
                 <Input id="file" type="file" accept=".csv,.xlsx,.xls" onChange={handleFileChange} className="mt-1" />
-                <p className="text-xs text-muted-foreground mt-1">Supported formats: CSV, Excel (.xlsx, .xls)</p>
+                <p className="text-xs text-muted-foreground mt-1">Formats supportés : CSV, Excel (.xlsx, .xls)</p>
               </div>
+
+              {type === "organizations" && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Colonnes attendues pour les organisations :</h4>
+                  <div className="text-xs text-blue-700 space-y-1">
+                    <p><strong>Obligatoire :</strong> Nom</p>
+                    <p><strong>Optionnel :</strong> Type/Industrie, Catégorie (étoiles), Région, Zone géographique, District, Ville, Adresse précise, Secteur, Site web, Nombre de chambres, Téléphone, Email, Contact principal, Notes, Statut</p>
+                  </div>
+                </div>
+              )}
 
               {file && (
                 <div className="p-3 bg-muted rounded-lg">
@@ -267,11 +334,11 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
               )}
 
               <div className="flex gap-2">
-                <Button onClick={handleClose} variant="outline" className="flex-1 bg-transparent">
-                  Cancel
+                <Button onClick={handleClose} variant="outline" className="flex-1">
+                  Annuler
                 </Button>
                 <Button onClick={handleParseFile} disabled={!file || importing} className="flex-1">
-                  {importing ? "Parsing..." : "Next"}
+                  {importing ? "Analyse..." : "Suivant"}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -282,12 +349,21 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
             <>
               <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  Map the columns from your file to the expected fields. Required fields are marked with *.
+                  Mappez les colonnes de votre fichier avec les champs attendus. Les champs obligatoires sont marqués d'un *.
                 </div>
 
-                <div className="grid gap-3">
+                {!requiredFieldsMapped && (
+                  <Alert className="border-amber-200 bg-amber-50">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <AlertDescription className="text-amber-800">
+                      Certains champs obligatoires ne sont pas mappés. Veuillez mapper au minimum le champ "Nom".
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="grid gap-3 max-h-64 overflow-y-auto">
                   {expectedFields.map((field) => (
-                    <div key={field.key} className="flex items-center gap-3">
+                    <div key={field.key} className="flex items-center gap-3 p-2 border rounded-lg">
                       <div className="w-1/3">
                         <Label className="text-sm font-medium">
                           {field.label}
@@ -306,13 +382,13 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select column..." />
+                            <SelectValue placeholder="Sélectionner une colonne..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="skip">-- Skip this field --</SelectItem>
+                            <SelectItem value="skip">-- Ignorer ce champ --</SelectItem>
                             {fileColumns.map((column) => (
                               <SelectItem key={column} value={column || `column_${Math.random()}`}>
-                                {column || "Unnamed Column"}
+                                {column || "Colonne sans nom"}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -324,8 +400,8 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
 
                 {parsedData.length > 0 && (
                   <div className="mt-4">
-                    <Label className="text-sm font-medium">Preview (first 3 rows):</Label>
-                    <div className="mt-2 text-xs bg-muted p-3 rounded-lg overflow-x-auto">
+                    <Label className="text-sm font-medium">Aperçu (3 premières lignes) :</Label>
+                    <div className="mt-2 text-xs bg-muted p-3 rounded-lg overflow-x-auto max-h-40">
                       <pre>{JSON.stringify(parsedData.slice(0, 3), null, 2)}</pre>
                     </div>
                   </div>
@@ -334,10 +410,14 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
 
               <div className="flex gap-2">
                 <Button onClick={() => setStep("upload")} variant="outline" className="flex-1">
-                  Back
+                  Retour
                 </Button>
-                <Button onClick={handleFinalImport} disabled={importing} className="flex-1">
-                  {importing ? "Importing..." : `Import ${parsedData.length} records`}
+                <Button 
+                  onClick={handleFinalImport} 
+                  disabled={importing || !requiredFieldsMapped} 
+                  className="flex-1"
+                >
+                  {importing ? "Import en cours..." : `Importer ${parsedData.length} enregistrements`}
                 </Button>
               </div>
             </>
@@ -345,32 +425,41 @@ export function ImportModal({ isOpen, onClose, onImport, type }: ImportModalProp
 
           {step === "result" && result && (
             <div className="space-y-3">
-              <Alert className={result.success ? "border-green-200" : "border-red-200"}>
+              <Alert className={result.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
                 <div className="flex items-center gap-2">
                   {result.success ? (
                     <CheckCircle className="w-4 h-4 text-green-600" />
                   ) : (
                     <AlertCircle className="w-4 h-4 text-red-600" />
                   )}
-                  <AlertDescription>
-                    {result.success ? `Successfully imported ${result.imported} records` : "Import failed"}
+                  <AlertDescription className={result.success ? "text-green-800" : "text-red-800"}>
+                    {result.success 
+                      ? `${result.imported} enregistrement(s) importé(s) avec succès` 
+                      : "Échec de l'importation"}
                   </AlertDescription>
                 </div>
               </Alert>
 
               {result.errors.length > 0 && (
-                <div className="text-sm text-red-600">
-                  <p className="font-medium">Errors:</p>
-                  <ul className="list-disc list-inside">
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                  <p className="font-medium mb-2">Erreurs :</p>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
                     {result.errors.map((error, index) => (
-                      <li key={index}>{error}</li>
+                      <div key={index} className="text-xs">• {error}</div>
                     ))}
-                  </ul>
+                  </div>
+                </div>
+              )}
+
+              {result.success && result.imported > 0 && (
+                <div className="text-sm text-green-700 bg-green-50 p-3 rounded-lg">
+                  <p className="font-medium">Import terminé avec succès !</p>
+                  <p className="text-xs mt-1">{result.imported} organisation(s) ajoutée(s) à votre base de données.</p>
                 </div>
               )}
 
               <Button onClick={handleClose} className="w-full">
-                Close
+                Fermer
               </Button>
             </div>
           )}
