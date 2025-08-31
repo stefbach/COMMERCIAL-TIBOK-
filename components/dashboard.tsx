@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Building2, DollarSign, Users, Trophy, Calendar, FileCheck, Send, CalendarClock, BarChart3, MapPin } from 'lucide-react'
 import { SupabaseClientDB } from "@/lib/supabase-db"
 
@@ -28,14 +29,6 @@ interface GeographicalStats {
   contractCount: number
 }
 
-interface HotelGeographicalStats {
-  region: string
-  hotelCount: number
-  appointmentCount: number
-  contractCount: number
-  cities: string[]
-}
-
 interface CardinalZoneStats {
   zone: string
   organizationCount: number
@@ -45,7 +38,7 @@ interface CardinalZoneStats {
 }
 
 interface ZoneDetails {
-  type: "sector" | "geographical" | "hotel" | "cardinal"
+  type: "sector" | "geographical" | "cardinal"
   name: string
   organizations: any[]
   stats: {
@@ -66,7 +59,6 @@ export function Dashboard() {
   })
   const [sectorStats, setSectorStats] = useState<SectorStats[]>([])
   const [geographicalStats, setGeographicalStats] = useState<GeographicalStats[]>([])
-  const [hotelGeographicalStats, setHotelGeographicalStats] = useState<HotelGeographicalStats[]>([])
   const [cardinalZoneStats, setCardinalZoneStats] = useState<CardinalZoneStats[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedZone, setSelectedZone] = useState<ZoneDetails | null>(null)
@@ -83,15 +75,6 @@ export function Dashboard() {
       const organizations = await SupabaseClientDB.getOrganizations()
       const appointments = await SupabaseClientDB.getAppointments()
       const contracts = await SupabaseClientDB.getContracts()
-
-      console.log("[v0] Processing", organizations.length, "organizations")
-
-      const allSectors = new Set()
-      organizations.forEach((org) => {
-        const sector = org.secteur || org.industry || "Non spécifié"
-        allSectors.add(sector)
-      })
-      console.log("[v0] All sectors found:", Array.from(allSectors))
 
       const completedAppointments = appointments.filter(
         (apt) => apt.status === "Completed" || apt.status === "completed",
@@ -120,6 +103,7 @@ export function Dashboard() {
         upcomingAppointments,
       })
 
+      // Statistiques par secteur
       const sectorMap = new Map<string, SectorStats>()
 
       organizations.forEach((org) => {
@@ -157,16 +141,13 @@ export function Dashboard() {
 
       setSectorStats(Array.from(sectorMap.values()).sort((a, b) => b.organizationCount - a.organizationCount))
 
+      // Statistiques géographiques
       const geographicalMap = new Map<string, GeographicalStats>()
-      const hotelGeographicalMap = new Map<string, HotelGeographicalStats>()
       const cardinalZoneMap = new Map<string, CardinalZoneStats>()
-
-      let hotelCount = 0
 
       organizations.forEach((org) => {
         const country = org.country || org.pays || "Non spécifié"
         const city = org.city || org.ville || ""
-        const region = getRegionFromCountry(country)
         const location = city ? `${city}, ${country}` : country
 
         if (!geographicalMap.has(location)) {
@@ -179,6 +160,7 @@ export function Dashboard() {
         }
         geographicalMap.get(location)!.organizationCount++
 
+        // Zones cardinales pour Maurice seulement
         if (country.toLowerCase() === "maurice" && city) {
           const cardinalZone = getCardinalZoneFromCity(city)
           if (!cardinalZoneMap.has(cardinalZone)) {
@@ -196,69 +178,13 @@ export function Dashboard() {
             zoneStats.cities.push(city)
           }
         }
-
-        const sector = (org.secteur || org.industry || "").toLowerCase()
-        const name = (org.name || org.nom || "").toLowerCase()
-
-        const isHotel =
-          sector.includes("hôtel") ||
-          sector.includes("hotel") ||
-          sector.includes("hospitalité") ||
-          sector.includes("hospitality") ||
-          sector.includes("hébergement") ||
-          sector.includes("accommodation") ||
-          sector.includes("resort") ||
-          sector.includes("auberge") ||
-          sector.includes("inn") ||
-          sector.includes("lodge") ||
-          sector.includes("motel") ||
-          sector.includes("guesthouse") ||
-          sector.includes("pension") ||
-          sector.includes("riad") ||
-          sector.includes("palace") ||
-          sector.includes("château") ||
-          sector.includes("castle") ||
-          sector.includes("spa") ||
-          sector.includes("wellness") ||
-          sector.includes("tourisme") ||
-          sector.includes("tourism") ||
-          name.includes("hotel") ||
-          name.includes("hôtel") ||
-          name.includes("resort") ||
-          name.includes("inn") ||
-          name.includes("lodge") ||
-          name.includes("palace") ||
-          name.includes("riad")
-
-        if (isHotel) {
-          hotelCount++
-          if (!hotelGeographicalMap.has(region)) {
-            hotelGeographicalMap.set(region, {
-              region,
-              hotelCount: 0,
-              appointmentCount: 0,
-              contractCount: 0,
-              cities: [],
-            })
-          }
-          const hotelStats = hotelGeographicalMap.get(region)!
-          hotelStats.hotelCount++
-          if (city && !hotelStats.cities.includes(city)) {
-            hotelStats.cities.push(city)
-          }
-        }
       })
-
-      console.log("[v0] Total hotels detected:", hotelCount)
-      console.log("[v0] Hotels by region:", Array.from(hotelGeographicalMap.entries()))
-      console.log("[v0] Geographical locations:", Array.from(geographicalMap.entries()).length)
 
       appointments.forEach((apt) => {
         const org = organizations.find((o) => o.id === apt.organizationId)
         if (org) {
           const country = org.country || org.pays || "Non spécifié"
           const city = org.city || org.ville || ""
-          const region = getRegionFromCountry(country)
           const location = city ? `${city}, ${country}` : country
 
           if (geographicalMap.has(location)) {
@@ -271,43 +197,6 @@ export function Dashboard() {
               cardinalZoneMap.get(cardinalZone)!.appointmentCount++
             }
           }
-
-          const sector = (org.secteur || org.industry || "").toLowerCase()
-          const name = (org.name || org.nom || "").toLowerCase()
-
-          const isHotel =
-            sector.includes("hôtel") ||
-            sector.includes("hotel") ||
-            sector.includes("hospitalité") ||
-            sector.includes("hospitality") ||
-            sector.includes("hébergement") ||
-            sector.includes("accommodation") ||
-            sector.includes("resort") ||
-            sector.includes("auberge") ||
-            sector.includes("inn") ||
-            sector.includes("lodge") ||
-            sector.includes("motel") ||
-            sector.includes("guesthouse") ||
-            sector.includes("pension") ||
-            sector.includes("riad") ||
-            sector.includes("palace") ||
-            sector.includes("château") ||
-            sector.includes("castle") ||
-            sector.includes("spa") ||
-            sector.includes("wellness") ||
-            sector.includes("tourisme") ||
-            sector.includes("tourism") ||
-            name.includes("hotel") ||
-            name.includes("hôtel") ||
-            name.includes("resort") ||
-            name.includes("inn") ||
-            name.includes("lodge") ||
-            name.includes("palace") ||
-            name.includes("riad")
-
-          if (isHotel && hotelGeographicalMap.has(region)) {
-            hotelGeographicalMap.get(region)!.appointmentCount++
-          }
         }
       })
 
@@ -316,7 +205,6 @@ export function Dashboard() {
         if (org) {
           const country = org.country || org.pays || "Non spécifié"
           const city = org.city || org.ville || ""
-          const region = getRegionFromCountry(country)
           const location = city ? `${city}, ${country}` : country
 
           if (geographicalMap.has(location)) {
@@ -329,51 +217,12 @@ export function Dashboard() {
               cardinalZoneMap.get(cardinalZone)!.contractCount++
             }
           }
-
-          const sector = (org.secteur || org.industry || "").toLowerCase()
-          const name = (org.name || org.nom || "").toLowerCase()
-
-          const isHotel =
-            sector.includes("hôtel") ||
-            sector.includes("hotel") ||
-            sector.includes("hospitalité") ||
-            sector.includes("hospitality") ||
-            sector.includes("hébergement") ||
-            sector.includes("accommodation") ||
-            sector.includes("resort") ||
-            sector.includes("auberge") ||
-            sector.includes("inn") ||
-            sector.includes("lodge") ||
-            sector.includes("motel") ||
-            sector.includes("guesthouse") ||
-            sector.includes("pension") ||
-            sector.includes("riad") ||
-            sector.includes("palace") ||
-            sector.includes("château") ||
-            sector.includes("castle") ||
-            sector.includes("spa") ||
-            sector.includes("wellness") ||
-            sector.includes("tourisme") ||
-            sector.includes("tourism") ||
-            name.includes("hotel") ||
-            name.includes("hôtel") ||
-            name.includes("resort") ||
-            name.includes("inn") ||
-            name.includes("lodge") ||
-            name.includes("palace") ||
-            name.includes("riad")
-
-          if (isHotel && hotelGeographicalMap.has(region)) {
-            hotelGeographicalMap.get(region)!.contractCount++
-          }
         }
       })
 
       setGeographicalStats(
         Array.from(geographicalMap.values()).sort((a, b) => b.organizationCount - a.organizationCount),
       )
-
-      setHotelGeographicalStats(Array.from(hotelGeographicalMap.values()).sort((a, b) => b.hotelCount - a.hotelCount))
 
       setCardinalZoneStats(
         Array.from(cardinalZoneMap.values()).sort((a, b) => b.organizationCount - a.organizationCount),
@@ -406,46 +255,6 @@ export function Dashboard() {
           return location === name
         })
         break
-      case "hotel":
-        filteredOrganizations = allOrganizations.filter((org) => {
-          const country = org.country || org.pays || "Non spécifié"
-          const region = getRegionFromCountry(country)
-          const sector = (org.secteur || org.industry || "").toLowerCase()
-          const orgName = (org.name || org.nom || "").toLowerCase()
-
-          const isHotel =
-            sector.includes("hôtel") ||
-            sector.includes("hotel") ||
-            sector.includes("hospitalité") ||
-            sector.includes("hospitality") ||
-            sector.includes("hébergement") ||
-            sector.includes("accommodation") ||
-            sector.includes("resort") ||
-            sector.includes("auberge") ||
-            sector.includes("inn") ||
-            sector.includes("lodge") ||
-            sector.includes("motel") ||
-            sector.includes("guesthouse") ||
-            sector.includes("pension") ||
-            sector.includes("riad") ||
-            sector.includes("palace") ||
-            sector.includes("château") ||
-            sector.includes("castle") ||
-            sector.includes("spa") ||
-            sector.includes("wellness") ||
-            sector.includes("tourisme") ||
-            sector.includes("tourism") ||
-            orgName.includes("hotel") ||
-            orgName.includes("hôtel") ||
-            orgName.includes("resort") ||
-            orgName.includes("inn") ||
-            orgName.includes("lodge") ||
-            orgName.includes("palace") ||
-            orgName.includes("riad")
-
-          return isHotel && region === name
-        })
-        break
       case "cardinal":
         filteredOrganizations = allOrganizations.filter((org) => {
           const country = org.country || org.pays || "Non spécifié"
@@ -474,124 +283,6 @@ export function Dashboard() {
       },
       cities,
     })
-  }
-
-  const getRegionFromCountry = (country: string): string => {
-    const countryLower = country.toLowerCase()
-
-    if (
-      [
-        "france",
-        "allemagne",
-        "germany",
-        "italie",
-        "italy",
-        "espagne",
-        "spain",
-        "portugal",
-        "belgique",
-        "belgium",
-        "pays-bas",
-        "netherlands",
-        "suisse",
-        "switzerland",
-        "autriche",
-        "austria",
-        "royaume-uni",
-        "uk",
-        "united kingdom",
-      ].includes(countryLower)
-    ) {
-      return "Europe"
-    }
-
-    if (["maroc", "morocco", "tunisie", "tunisia", "algérie", "algeria", "égypte", "egypt"].includes(countryLower)) {
-      return "Afrique du Nord"
-    }
-
-    if (
-      [
-        "sénégal",
-        "senegal",
-        "côte d'ivoire",
-        "ivory coast",
-        "ghana",
-        "nigeria",
-        "mali",
-        "burkina faso",
-        "guinée",
-        "guinea",
-      ].includes(countryLower)
-    ) {
-      return "Afrique de l'Ouest"
-    }
-
-    if (
-      [
-        "cameroun",
-        "cameroon",
-        "gabon",
-        "congo",
-        "république centrafricaine",
-        "central african republic",
-        "tchad",
-        "chad",
-      ].includes(countryLower)
-    ) {
-      return "Afrique Centrale"
-    }
-
-    if (
-      ["kenya", "tanzanie", "tanzania", "ouganda", "uganda", "éthiopie", "ethiopia", "rwanda", "burundi"].includes(
-        countryLower,
-      )
-    ) {
-      return "Afrique de l'Est"
-    }
-
-    if (["états-unis", "usa", "united states", "canada", "mexique", "mexico"].includes(countryLower)) {
-      return "Amérique du Nord"
-    }
-
-    if (
-      [
-        "chine",
-        "china",
-        "japon",
-        "japan",
-        "corée du sud",
-        "south korea",
-        "inde",
-        "india",
-        "thaïlande",
-        "thailand",
-        "vietnam",
-        "singapour",
-        "singapore",
-      ].includes(countryLower)
-    ) {
-      return "Asie"
-    }
-
-    if (
-      [
-        "émirats arabes unis",
-        "uae",
-        "arabie saoudite",
-        "saudi arabia",
-        "qatar",
-        "koweït",
-        "kuwait",
-        "liban",
-        "lebanon",
-        "jordanie",
-        "jordan",
-      ].includes(countryLower)
-    ) {
-      return "Moyen-Orient"
-    }
-
-    return country || "Non spécifié"
   }
 
   const getCardinalZoneFromCity = (city: string): string => {
@@ -685,14 +376,6 @@ export function Dashboard() {
     return "Centre"
   }
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(value)
-  }
-
   if (loading) {
     return (
       <div className="p-6">
@@ -704,13 +387,15 @@ export function Dashboard() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div>
         <h2 className="text-3xl font-bold text-blue-600">Dashboard</h2>
         <p className="text-muted-foreground">Vue d'ensemble de votre activité commerciale</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Stats principales */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Organisations</CardTitle>
@@ -762,199 +447,121 @@ export function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Répartition par Secteur
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {sectorStats.slice(0, 6).map((sector, index) => (
-                <div
-                  key={sector.sector}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
-                  onClick={() => handleZoneClick("sector", sector.sector)}
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">{sector.sector}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {sector.organizationCount} structure{sector.organizationCount > 1 ? "s" : ""}
-                    </div>
-                  </div>
-                  <div className="flex gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="font-bold text-green-600">{sector.appointmentCount}</div>
-                      <div className="text-xs text-muted-foreground">RDV</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-blue-600">{sector.contractCount}</div>
-                      <div className="text-xs text-muted-foreground">Contrats</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {sectorStats.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">Aucune donnée de secteur disponible</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Analyses avec onglets */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            Analyses Détaillées
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="sectors" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="sectors">Par Secteur</TabsTrigger>
+              <TabsTrigger value="geography">Géographie Générale</TabsTrigger>
+              <TabsTrigger value="maurice">Zones Maurice</TabsTrigger>
+            </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              Hôtels par Région
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {hotelGeographicalStats.slice(0, 8).map((region, index) => (
-                <div
-                  key={region.region}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
-                  onClick={() => handleZoneClick("hotel", region.region, region.cities)}
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">{region.region}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {region.hotelCount} hôtel{region.hotelCount > 1 ? "s" : ""} • {region.cities.length} ville
-                      {region.cities.length > 1 ? "s" : ""}
-                    </div>
-                    {region.cities.length > 0 && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {region.cities.slice(0, 3).join(", ")}
-                        {region.cities.length > 3 && ` +${region.cities.length - 3}`}
+            <TabsContent value="sectors" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                {sectorStats.slice(0, 12).map((sector) => (
+                  <div
+                    key={sector.sector}
+                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+                    onClick={() => handleZoneClick("sector", sector.sector)}
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium text-foreground text-sm">{sector.sector}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {sector.organizationCount} structure{sector.organizationCount > 1 ? "s" : ""}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="font-bold text-green-600">{region.appointmentCount}</div>
-                      <div className="text-xs text-muted-foreground">RDV</div>
                     </div>
-                    <div className="text-center">
-                      <div className="font-bold text-blue-600">{region.contractCount}</div>
-                      <div className="text-xs text-muted-foreground">Contrats</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {hotelGeographicalStats.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">Aucun hôtel trouvé</div>
-              )}
-              {hotelGeographicalStats.length > 0 && (
-                <div className="text-center text-sm text-muted-foreground pt-2 border-t">
-                  Total: {hotelGeographicalStats.reduce((sum, region) => sum + region.hotelCount, 0)} hôtels détectés
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" />
-              Zones Cardinales (Maurice)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {cardinalZoneStats.map((zone, index) => (
-                <div
-                  key={zone.zone}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
-                  onClick={() => handleZoneClick("cardinal", zone.zone, zone.cities)}
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">{zone.zone}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {zone.organizationCount} structure{zone.organizationCount > 1 ? "s" : ""} • {zone.cities.length}{" "}
-                      ville{zone.cities.length > 1 ? "s" : ""}
-                    </div>
-                    {zone.cities.length > 0 && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {zone.cities.slice(0, 3).join(", ")}
-                        {zone.cities.length > 3 && ` +${zone.cities.length - 3}`}
+                    <div className="flex gap-3 text-xs">
+                      <div className="text-center">
+                        <div className="font-bold text-green-600">{sector.appointmentCount}</div>
+                        <div className="text-xs text-muted-foreground">RDV</div>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="font-bold text-green-600">{zone.appointmentCount}</div>
-                      <div className="text-xs text-muted-foreground">RDV</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-blue-600">{zone.contractCount}</div>
-                      <div className="text-xs text-muted-foreground">Contrats</div>
+                      <div className="text-center">
+                        <div className="font-bold text-blue-600">{sector.contractCount}</div>
+                        <div className="text-xs text-muted-foreground">Contrats</div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              {cardinalZoneStats.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">Aucune donnée de zone cardinale disponible</div>
-              )}
-              {cardinalZoneStats.length > 0 && (
-                <div className="text-center text-sm text-muted-foreground pt-2 border-t">
-                  Total: {cardinalZoneStats.reduce((sum, zone) => sum + zone.organizationCount, 0)} structures dans{" "}
-                  {cardinalZoneStats.length} zones
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" />
-              Répartition Géographique
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {geographicalStats.map((location, index) => (
-                <div
-                  key={location.location}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
-                  onClick={() => handleZoneClick("geographical", location.location)}
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">{location.location}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {location.organizationCount} structure{location.organizationCount > 1 ? "s" : ""}
+            <TabsContent value="geography" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                {geographicalStats.slice(0, 10).map((location) => (
+                  <div
+                    key={location.location}
+                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+                    onClick={() => handleZoneClick("geographical", location.location)}
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium text-foreground">{location.location}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {location.organizationCount} structure{location.organizationCount > 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <div className="flex gap-4 text-sm">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-green-600">{location.appointmentCount}</div>
+                        <div className="text-xs text-muted-foreground">RDV</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-blue-600">{location.contractCount}</div>
+                        <div className="text-xs text-muted-foreground">Contrats</div>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{location.appointmentCount}</div>
-                      <div className="text-sm text-muted-foreground">RDV</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{location.contractCount}</div>
-                      <div className="text-sm text-muted-foreground">Contrats</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {geographicalStats.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">Aucune donnée géographique disponible</div>
-              )}
-              {geographicalStats.length > 0 && (
-                <div className="text-center text-sm text-muted-foreground pt-2 border-t">
-                  Total: {geographicalStats.reduce((sum, location) => sum + location.organizationCount, 0)} structures
-                  dans {geographicalStats.length} localisations
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                ))}
+              </div>
+            </TabsContent>
 
+            <TabsContent value="maurice" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {cardinalZoneStats.map((zone) => (
+                  <div
+                    key={zone.zone}
+                    className="p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+                    onClick={() => handleZoneClick("cardinal", zone.zone, zone.cities)}
+                  >
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-primary mb-2">{zone.zone}</div>
+                      <div className="space-y-2">
+                        <div>
+                          <div className="text-xl font-bold text-blue-600">{zone.organizationCount}</div>
+                          <div className="text-xs text-muted-foreground">Structures</div>
+                        </div>
+                        <div className="flex justify-around text-xs">
+                          <div>
+                            <div className="font-bold text-green-600">{zone.appointmentCount}</div>
+                            <div className="text-muted-foreground">RDV</div>
+                          </div>
+                          <div>
+                            <div className="font-bold text-purple-600">{zone.contractCount}</div>
+                            <div className="text-muted-foreground">Contrats</div>
+                          </div>
+                        </div>
+                      </div>
+                      {zone.cities.length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-2 border-t pt-2">
+                          {zone.cities.length} ville{zone.cities.length > 1 ? "s" : ""}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Dialog pour les détails */}
       <Dialog open={!!selectedZone} onOpenChange={() => setSelectedZone(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -979,10 +586,6 @@ export function Dashboard() {
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">{selectedZone.stats.contractCount}</div>
                   <div className="text-sm text-muted-foreground">Contrats</div>
-                </div>
-                <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">{selectedZone.stats.contractCount}</div>
-                  <div className="text-sm text-muted-foreground">Contrats Envoyés</div>
                 </div>
               </div>
 
