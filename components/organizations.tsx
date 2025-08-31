@@ -76,7 +76,6 @@ function SupabaseDiagnostic() {
       secteur: "Tourisme",
       zone_geographique: "Nord",
       contact_principal: "Jean Dupont",
-      contact_fonction: "Manager",
       notes: "Test d'importation",
     }
 
@@ -144,6 +143,7 @@ export function Organizations() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showDiagnostic, setShowDiagnostic] = useState(false)
 
+  // Filtres corrigés - SANS priority
   const [filters, setFilters] = useState({
     type: "",
     ville: "",
@@ -152,7 +152,6 @@ export function Organizations() {
     categorie: "",
     region: "",
     status: "",
-    priority: "",
   })
   const [showFilters, setShowFilters] = useState(false)
 
@@ -165,6 +164,7 @@ export function Organizations() {
       const orgs = await SupabaseClientDB.getOrganizations()
 
       if (orgs.length === 0) {
+        // Données de démo corrigées - SANS priority, size, country, contact_fonction
         const demoOrgs = [
           {
             id: "demo-1",
@@ -182,10 +182,8 @@ export function Organizations() {
             secteur: "Tourisme",
             zone_geographique: "Nord",
             contact_principal: "Jean Dupont",
-            contact_fonction: "Manager",
             notes: "Hôtel de luxe au centre-ville",
             status: "active",
-            priority: "high",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
@@ -205,10 +203,8 @@ export function Organizations() {
             secteur: "Tourisme",
             zone_geographique: "Nord",
             contact_principal: "Marie Lagesse",
-            contact_fonction: "Directrice",
             notes: "Resort de luxe en bord de mer",
             status: "prospect",
-            priority: "medium",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
@@ -260,10 +256,12 @@ export function Organizations() {
     }
   }
 
-  const handleQualifyOrganization = async (org: Organization, newStatus: string, newPriority: string) => {
-    await handleUpdateOrganization(org, { status: newStatus, priority: newPriority })
+  // Fonction corrigée - SANS priority
+  const handleQualifyOrganization = async (org: Organization, newStatus: string) => {
+    await handleUpdateOrganization(org, { status: newStatus })
   }
 
+  // Fonction corrigée - SANS priority
   const resetFilters = () => {
     setFilters({
       type: "",
@@ -273,10 +271,10 @@ export function Organizations() {
       categorie: "",
       region: "",
       status: "",
-      priority: "",
     })
   }
 
+  // Filtrage corrigé - SANS priority
   const filteredOrganizations = organizations.filter((org) => {
     const matchesSearch =
       org.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -292,8 +290,7 @@ export function Organizations() {
       (!filters.district || org.district?.toLowerCase().includes(filters.district.toLowerCase())) &&
       (!filters.categorie || org.category?.toLowerCase().includes(filters.categorie.toLowerCase())) &&
       (!filters.region || org.region?.toLowerCase() === filters.region.toLowerCase()) &&
-      (!filters.status || org.status?.toLowerCase() === filters.status.toLowerCase()) &&
-      (!filters.priority || org.priority?.toLowerCase() === filters.priority.toLowerCase())
+      (!filters.status || org.status?.toLowerCase() === filters.status.toLowerCase())
 
     return matchesSearch && matchesFilters
   })
@@ -302,6 +299,7 @@ export function Organizations() {
     return [...new Set(organizations.map((org) => org[field]).filter(Boolean))] as string[]
   }
 
+  // Fonction d'import corrigée - SANS les champs inexistants
   const handleImportOrganizations = async (data: any[]): Promise<ImportResult> => {
     try {
       let imported = 0
@@ -327,14 +325,8 @@ export function Organizations() {
             phone: row.phone || row.telephone || row["Téléphone"] || "",
             email: row.email || row["Email"] || "",
             notes: row.notes || row.commentaires || row["Commentaires"] || "",
-            size: row.size || "Medium",
-            country: row.country || row.pays || "Maurice",
-            status: row.status || row.statut || "Prospect",
+            status: row.status || row.statut || "prospect",
             contact_principal: row.contact_name || row.contact_nom || row.contact_principal || "",
-            contact_fonction: row.contact_fonction || row.role || row.position || "",
-            prospectStatus: row.prospect_status || "not_contacted",
-            priority: row.priority || "medium",
-            source: row.source || "Import CSV",
           }
 
           if (org.name) {
@@ -373,18 +365,7 @@ export function Organizations() {
         return "bg-yellow-100 text-yellow-800"
       case "inactive":
         return "bg-gray-100 text-gray-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority?.toLowerCase()) {
-      case "high":
-        return "bg-red-100 text-red-800"
-      case "medium":
-        return "bg-orange-100 text-orange-800"
-      case "low":
+      case "client":
         return "bg-blue-100 text-blue-800"
       default:
         return "bg-gray-100 text-gray-800"
@@ -530,7 +511,7 @@ export function Organizations() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 p-4 bg-muted/50 rounded-lg">
             <Select value={filters.type} onValueChange={(value) => setFilters((prev) => ({ ...prev, type: value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Type" />
@@ -639,21 +620,7 @@ export function Organizations() {
                 <SelectItem value="prospect">Prospect</SelectItem>
                 <SelectItem value="active">Actif</SelectItem>
                 <SelectItem value="inactive">Inactif</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.priority}
-              onValueChange={(value) => setFilters((prev) => ({ ...prev, priority: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Priorité" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes les priorités</SelectItem>
-                <SelectItem value="high">Haute</SelectItem>
-                <SelectItem value="medium">Moyenne</SelectItem>
-                <SelectItem value="low">Basse</SelectItem>
+                <SelectItem value="client">Client</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -685,11 +652,6 @@ export function Organizations() {
                     <Badge className={getStatusColor(org.status || "")} variant="secondary">
                       {org.status}
                     </Badge>
-                    {org.priority && (
-                      <Badge className={getPriorityColor(org.priority)} variant="outline">
-                        {org.priority}
-                      </Badge>
-                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -707,7 +669,6 @@ export function Organizations() {
                       <User className="w-5 h-5 text-blue-600 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-blue-900 truncate">{org.contact_principal}</p>
-                        {org.contact_fonction && <p className="text-xs text-blue-600">{org.contact_fonction}</p>}
                       </div>
                     </div>
                   )}
@@ -726,15 +687,13 @@ export function Organizations() {
                     </div>
                   )}
 
-                  {(org.city || org.country || org.region || org.district || org.zone_geographique) && (
+                  {(org.city || org.region || org.district || org.zone_geographique) && (
                     <div className="p-3 bg-orange-50 rounded-lg">
                       <div className="flex items-start space-x-3">
                         <MapPin className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 space-y-1">
-                          {(org.city || org.country) && (
-                            <p className="text-sm font-semibold text-orange-900">
-                              {org.city && org.country ? `${org.city}, ${org.country}` : org.city || org.country}
-                            </p>
+                          {org.city && (
+                            <p className="text-sm font-semibold text-orange-900">{org.city}</p>
                           )}
                           {org.address && <p className="text-xs text-orange-700">{org.address}</p>}
                           <div className="flex flex-wrap gap-1">
@@ -809,11 +768,11 @@ export function Organizations() {
                   <div className="flex items-center space-x-2 mb-3">
                     <span className="text-sm font-semibold text-gray-700">Qualification rapide</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="grid grid-cols-1 gap-2 mb-4">
                     <Select
                       value={org.status || ""}
                       onValueChange={(value) => {
-                        handleQualifyOrganization(org, value, org.priority || "medium")
+                        handleQualifyOrganization(org, value)
                       }}
                     >
                       <SelectTrigger className="h-9 text-sm" onClick={(e) => e.stopPropagation()}>
@@ -823,21 +782,7 @@ export function Organizations() {
                         <SelectItem value="prospect">Prospect</SelectItem>
                         <SelectItem value="active">Actif</SelectItem>
                         <SelectItem value="inactive">Inactif</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={org.priority || ""}
-                      onValueChange={(value) => {
-                        handleQualifyOrganization(org, org.status || "prospect", value)
-                      }}
-                    >
-                      <SelectTrigger className="h-9 text-sm" onClick={(e) => e.stopPropagation()}>
-                        <SelectValue placeholder="Priorité" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="high">Haute</SelectItem>
-                        <SelectItem value="medium">Moyenne</SelectItem>
-                        <SelectItem value="low">Basse</SelectItem>
+                        <SelectItem value="client">Client</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
