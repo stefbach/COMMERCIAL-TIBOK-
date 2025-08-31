@@ -1,5 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
-import { createClient as createBrowserClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import type { Organization, Contact, Deal, Activity, Appointment, Contract } from "@/types/crm"
 
 export interface Profile {
@@ -12,316 +11,10 @@ export interface Profile {
   updated_at: string
 }
 
-// Server-side database operations
-export class SupabaseDB {
-  private static async getServerClient() {
-    return await createClient()
-  }
-
-  // Organizations
-  static async getOrganizations(): Promise<Organization[]> {
-    console.log("[v0] Loading organizations...")
-
-    // Check if we should use demo mode
-    if (await this.isDemoMode()) {
-      console.log("[v0] Using demo mode for organizations")
-      const demoOrgs = this.getDemoData("organizations")
-      console.log("[v0] Demo organizations loaded:", demoOrgs.length)
-      return demoOrgs
-    }
-
-    try {
-      console.log("[v0] Using Supabase for organizations")
-      const supabase = await this.getServerClient()
-      const { data, error } = await supabase.from("organizations").select("*").order("created_at", { ascending: false })
-
-      if (error) {
-        console.log("[v0] Supabase error, falling back to demo mode:", error.message)
-        const demoOrgs = this.getDemoData("organizations")
-        console.log("[v0] Fallback organizations loaded:", demoOrgs.length)
-        return demoOrgs
-      }
-
-      console.log("[v0] Supabase organizations loaded:", data?.length || 0)
-      return data || []
-    } catch (error) {
-      console.log("[v0] Supabase failed, falling back to demo mode:", error)
-      const demoOrgs = this.getDemoData("organizations")
-      console.log("[v0] Fallback organizations loaded:", demoOrgs.length)
-      return demoOrgs
-    }
-  }
-
-  static async createOrganization(org: Omit<Organization, "id" | "created_at">): Promise<Organization> {
-    const supabase = await this.getServerClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("User not authenticated")
-
-    const { data, error } = await supabase
-      .from("organizations")
-      .insert({ ...org, created_at: new Date().toISOString() })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async updateOrganization(id: number, updates: Partial<Organization>): Promise<Organization> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase.from("organizations").update(updates).eq("id", id).select().single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async deleteOrganization(id: number): Promise<void> {
-    const supabase = await this.getServerClient()
-    const { error } = await supabase.from("organizations").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // Contacts
-  static async getContacts(): Promise<Contact[]> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase.from("contacts").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async createContact(contact: Omit<Contact, "id">): Promise<Contact> {
-    const supabase = await this.getServerClient()
-
-    const { data, error } = await supabase.from("contacts").insert(contact).select().single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async updateContact(id: string, updates: Partial<Contact>): Promise<Contact> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase
-      .from("contacts")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async deleteContact(id: string): Promise<void> {
-    const supabase = await this.getServerClient()
-    const { error } = await supabase.from("contacts").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // Deals
-  static async getDeals(): Promise<Deal[]> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase.from("deals").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async createDeal(deal: Omit<Deal, "id" | "created_at" | "updated_at" | "created_by">): Promise<Deal> {
-    const supabase = await this.getServerClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("User not authenticated")
-
-    const { data, error } = await supabase
-      .from("deals")
-      .insert({ ...deal, created_by: user.id })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async updateDeal(id: string, updates: Partial<Deal>): Promise<Deal> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase
-      .from("deals")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async deleteDeal(id: string): Promise<void> {
-    const supabase = await this.getServerClient()
-    const { error } = await supabase.from("deals").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // Activities
-  static async getActivities(): Promise<Activity[]> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase.from("activities").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async createActivity(
-    activity: Omit<Activity, "id" | "created_at" | "updated_at" | "created_by">,
-  ): Promise<Activity> {
-    const supabase = await this.getServerClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("User not authenticated")
-
-    const { data, error } = await supabase
-      .from("activities")
-      .insert({ ...activity, created_by: user.id })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async updateActivity(id: string, updates: Partial<Activity>): Promise<Activity> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase
-      .from("activities")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async deleteActivity(id: string): Promise<void> {
-    const supabase = await this.getServerClient()
-    const { error } = await supabase.from("activities").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // Appointments
-  static async getAppointments(): Promise<Appointment[]> {
-    const supabase = await this.getServerClient()
-    const { data, error } = await supabase
-      .from("appointments")
-      .select("*")
-      .order("appointment_date", { ascending: true })
-
-    if (error) throw error
-    return data || []
-  }
-
-  // The complete deleteAppointment method is implemented later in the class
-
-  static async getAppointmentsByOrganization(organizationId: string): Promise<Appointment[]> {
-    console.log("[v0] Loading appointments for organization:", organizationId)
-
-    const supabase = await this.getServerClient()
-
-    try {
-      const { data, error } = await supabase
-        .from("appointments")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .order("appointment_date", { ascending: false })
-
-      if (error) throw error
-      console.log("[v0] Supabase appointments loaded:", data?.length || 0)
-
-      if (!data || data.length === 0) {
-        console.log("[v0] Supabase returned empty data, checking localStorage fallback")
-        const appointments = this.getDemoData("appointments") as Appointment[]
-        console.log("[v0] Fallback appointments data:", appointments)
-        const filtered = appointments.filter(
-          (appointment: Appointment) => appointment.organization_id === organizationId,
-        )
-        console.log("[v0] Fallback appointments loaded:", filtered.length)
-        return filtered
-      }
-
-      return data || []
-    } catch (error) {
-      console.log("[v0] Supabase appointments failed, falling back to demo mode:", error)
-      const appointments = this.getDemoData("appointments") as Appointment[]
-      console.log("[v0] Fallback appointments data:", appointments)
-      const filtered = appointments.filter((appointment: Appointment) => appointment.organization_id === organizationId)
-      console.log("[v0] Fallback appointments loaded:", filtered.length)
-      return filtered
-    }
-  }
-
-  static async createAppointment(
-    appointment: Omit<Appointment, "id" | "created_at" | "updated_at">,
-  ): Promise<Appointment> {
-    console.log("[v0] createAppointment called with:", appointment)
-
-    try {
-      console.log("[v0] Using Supabase for appointment creation")
-      const supabase = await this.getServerClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        console.log("[v0] No authenticated user, falling back to demo mode")
-        throw new Error("User not authenticated")
-      }
-
-      const { data, error } = await supabase
-        .from("appointments")
-        .insert({
-          ...appointment,
-          created_by: user.id, // Add created_by field with authenticated user ID
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      console.log("[v0] Supabase appointment created:", data.id)
-      return data
-    } catch (error) {
-      console.log("[v0] Supabase creation failed, falling back to demo mode:", error.message)
-      const newAppointment: Appointment = {
-        ...appointment,
-        id: this.generateId(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      const appointments = this.getDemoData("appointments")
-      appointments.unshift(newAppointment)
-      this.setDemoData("appointments", appointments)
-      console.log("[v0] Fallback appointment created:", newAppointment.id)
-      return newAppointment
-    }
-  }
-}
-
 // Client-side database operations
 export class SupabaseClientDB {
   private static getClient() {
-    return createBrowserClient()
+    return createClient()
   }
 
   private static async isDemoMode(): Promise<boolean> {
@@ -357,55 +50,7 @@ export class SupabaseClientDB {
     }
   }
 
-  static async createOrganization(orgData: Partial<Organization>): Promise<Organization> {
-    console.log("[v0] Creating organization:", orgData.name)
-
-    const demoMode = false // Force Supabase usage
-    console.log("[v0] Forcing Supabase mode for organization creation")
-
-    // Try Supabase with only columns that exist in the database
-    try {
-      const supabase = this.getClient()
-
-      const supabaseData = {
-        name: orgData.name || "",
-        industry: orgData.industry || "",
-        category: orgData.category || "",
-        region: orgData.region || "",
-        zone_geographique: orgData.zone_geographique || "",
-        district: orgData.district || "",
-        city: orgData.city || "",
-        address: orgData.address || "",
-        secteur: orgData.secteur || "",
-        website: orgData.website || "",
-        nb_chambres: orgData.nb_chambres || 0,
-        phone: orgData.phone || "",
-        email: orgData.email || "",
-        notes: orgData.notes || "",
-        contact_principal: orgData.contact_principal || "",
-        contact_fonction: orgData.contact_fonction || "",
-        size: orgData.size || "",
-        country: orgData.country || "Maurice",
-        status: orgData.status || "Actif",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      const { data, error } = await supabase.from("organizations").insert([supabaseData]).select().single()
-
-      if (error) {
-        console.log("[v0] Supabase insert failed:", error.message)
-        throw error // Don't fallback, show the real error
-      }
-
-      console.log("[v0] Organization successfully created in Supabase")
-      return { ...data, priority: orgData.priority || "Moyenne" } as Organization
-    } catch (error) {
-      console.log("[v0] Supabase creation failed:", error)
-      throw error // Don't fallback, show the real error
-    }
-  }
-
+  // Organizations
   static async getOrganizations(): Promise<Organization[]> {
     console.log("[v0] Loading organizations...")
 
@@ -439,12 +84,93 @@ export class SupabaseClientDB {
     }
   }
 
+  static async createOrganization(orgData: Partial<Organization>): Promise<Organization> {
+    console.log("[v0] Creating organization:", orgData.name)
+
+    // Check demo mode first
+    if (await this.isDemoMode()) {
+      console.log("[v0] Using demo mode for organization creation")
+      const newOrg: Organization = {
+        id: parseInt(this.generateId()),
+        name: orgData.name || "",
+        industry: orgData.industry || "",
+        category: orgData.category || "",
+        region: orgData.region || "",
+        zone_geographique: orgData.zone_geographique || "",
+        district: orgData.district || "",
+        city: orgData.city || "",
+        address: orgData.address || "",
+        secteur: orgData.secteur || "",
+        website: orgData.website || "",
+        nb_chambres: orgData.nb_chambres || 0,
+        phone: orgData.phone || "",
+        email: orgData.email || "",
+        notes: orgData.notes || "",
+        contact_principal: orgData.contact_principal || "",
+        contact_fonction: orgData.contact_fonction || "",
+        size: orgData.size || "",
+        country: orgData.country || "Maurice",
+        status: orgData.status || "Actif",
+        priority: orgData.priority || "Moyenne",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        activityType: orgData.industry || "",
+      }
+      const organizations = this.getDemoData("organizations")
+      organizations.unshift(newOrg)
+      this.setDemoData("organizations", organizations)
+      return newOrg
+    }
+
+    // Try Supabase
+    try {
+      const supabase = this.getClient()
+
+      const supabaseData = {
+        name: orgData.name || "",
+        industry: orgData.industry || "",
+        category: orgData.category || "",
+        region: orgData.region || "",
+        zone_geographique: orgData.zone_geographique || "",
+        district: orgData.district || "",
+        city: orgData.city || "",
+        address: orgData.address || "",
+        secteur: orgData.secteur || "",
+        website: orgData.website || "",
+        nb_chambres: orgData.nb_chambres || 0,
+        phone: orgData.phone || "",
+        email: orgData.email || "",
+        notes: orgData.notes || "",
+        contact_principal: orgData.contact_principal || "",
+        contact_fonction: orgData.contact_fonction || "",
+        size: orgData.size || "",
+        country: orgData.country || "Maurice",
+        status: orgData.status || "Actif",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase.from("organizations").insert([supabaseData]).select().single()
+
+      if (error) {
+        console.log("[v0] Supabase insert failed:", error.message)
+        throw error
+      }
+
+      console.log("[v0] Organization successfully created in Supabase")
+      return { ...data, priority: orgData.priority || "Moyenne", activityType: data.industry } as Organization
+    } catch (error) {
+      console.log("[v0] Supabase creation failed:", error)
+      throw error
+    }
+  }
+
   static async updateOrganization(id: number, updates: Partial<Organization>): Promise<Organization> {
     if (await this.isDemoMode()) {
       const organizations = this.getDemoData("organizations")
       const index = organizations.findIndex((org: Organization) => org.id === id)
       if (index !== -1) {
-        organizations[index] = { ...organizations[index], ...updates }
+        organizations[index] = { ...organizations[index], ...updates, updated_at: new Date().toISOString() }
         this.setDemoData("organizations", organizations)
         return organizations[index]
       }
@@ -452,7 +178,7 @@ export class SupabaseClientDB {
     }
 
     const supabase = this.getClient()
-    const { data, error } = await supabase.from("organizations").update(updates).eq("id", id).select().single()
+    const { data, error } = await supabase.from("organizations").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id).select().single()
 
     if (error) throw error
     return data
@@ -498,7 +224,6 @@ export class SupabaseClientDB {
     }
 
     const supabase = this.getClient()
-
     const { data, error } = await supabase.from("contacts").insert(contact).select().single()
 
     if (error) throw error
@@ -530,7 +255,7 @@ export class SupabaseClientDB {
       const contacts = this.getDemoData("contacts")
       const index = contacts.findIndex((contact: Contact) => contact.id === id)
       if (index !== -1) {
-        contacts[index] = { ...contacts[index], ...updates }
+        contacts[index] = { ...contacts[index], ...updates, updated_at: new Date().toISOString() }
         this.setDemoData("contacts", contacts)
         return contacts[index]
       }
@@ -556,7 +281,7 @@ export class SupabaseClientDB {
       const contacts = this.getDemoData("contacts")
       const index = contacts.findIndex((contact: Contact) => contact.id === id)
       if (index !== -1) {
-        contacts[index] = { ...contacts[index], ...updates }
+        contacts[index] = { ...contacts[index], ...updates, updated_at: new Date().toISOString() }
         this.setDemoData("contacts", contacts)
         return contacts[index]
       }
@@ -911,7 +636,7 @@ export class SupabaseClientDB {
         .from("appointments")
         .insert({
           ...appointment,
-          created_by: user.id, // Add created_by field to satisfy NOT NULL constraint
+          created_by: user.id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -1032,7 +757,7 @@ export class SupabaseClientDB {
         value: contract.value,
         currency: contract.currency,
         status: contract.status,
-        assigned_to: contract.assigned_to || contract.assignedTo, // Handle both snake_case and camelCase
+        assigned_to: contract.assigned_to || contract.assignedTo,
         expiration_date: contract.expiration_date || contract.expirationDate,
         signed_date: contract.signed_date || contract.signedDate,
         notes: contract.notes,
@@ -1297,7 +1022,7 @@ export class SupabaseClientDB {
       case "organizations":
         return [
           {
-            id: "org1",
+            id: 1,
             name: "Hôtel Le Grand Palace",
             industry: "Hôtellerie",
             activityType: "Hôtel",
@@ -1316,7 +1041,7 @@ export class SupabaseClientDB {
             updated_at: "2024-01-15T10:00:00Z",
           },
           {
-            id: "org2",
+            id: 2,
             name: "Pharmacie Central",
             industry: "Santé",
             activityType: "Pharmacie",
@@ -1340,7 +1065,7 @@ export class SupabaseClientDB {
         return [
           {
             id: "1",
-            organization_id: "org1",
+            organization_id: 1,
             fullName: "Marie Dubois",
             role: "Directrice Générale",
             email: "marie.dubois@legrandpalace.com",
@@ -1360,7 +1085,7 @@ export class SupabaseClientDB {
           },
           {
             id: "2",
-            organization_id: "org2",
+            organization_id: 2,
             fullName: "Pierre Martin",
             role: "Pharmacien Titulaire",
             email: "pierre.martin@pharmaciecentral.fr",
@@ -1383,7 +1108,7 @@ export class SupabaseClientDB {
         return [
           {
             id: "z9fr8aj0e",
-            organization_id: "org1",
+            organization_id: "1",
             contact_id: "1",
             title: "Présentation solution CRM",
             description: "Démonstration des fonctionnalités principales",
@@ -1402,7 +1127,7 @@ export class SupabaseClientDB {
           },
           {
             id: "7d3o9kq7c",
-            organization_id: "org2",
+            organization_id: "2",
             contact_id: "2",
             title: "Appel de suivi",
             description: "Discussion sur les besoins spécifiques",
@@ -1424,7 +1149,7 @@ export class SupabaseClientDB {
         return [
           {
             id: "deal_001",
-            organization_id: "org1",
+            organization_id: 1,
             contact_id: "1",
             title: "CRM Solution - Hôtel Le Grand Palace",
             description: "Implémentation complète du système CRM",
@@ -1438,7 +1163,7 @@ export class SupabaseClientDB {
           },
           {
             id: "deal_002",
-            organization_id: "org2",
+            organization_id: 2,
             contact_id: "2",
             title: "CRM Solution - Pharmacie Central",
             description: "Solution CRM adaptée aux pharmacies",
@@ -1456,7 +1181,7 @@ export class SupabaseClientDB {
         return [
           {
             id: "contract_001",
-            organizationId: "org1",
+            organizationId: 1,
             contactId: "1",
             title: "Contrat CRM Hôtel Le Grand Palace",
             description: "Solution CRM complète pour la gestion des clients et réservations",
@@ -1473,7 +1198,7 @@ export class SupabaseClientDB {
           },
           {
             id: "contract_002",
-            organizationId: "org2",
+            organizationId: 2,
             contactId: "2",
             title: "Contrat CRM Pharmacie Central",
             description: "Solution CRM adaptée aux pharmacies avec gestion des stocks",
@@ -1536,54 +1261,26 @@ export class SupabaseClientDB {
   }
 }
 
-// Function to initialize demo data
+// Fonction d'initialisation des données de démonstration
 function initializeDemoData() {
   if (typeof window === "undefined") return
 
-  // Initialize organizations with more complete data
-  if (!localStorage.getItem("demo_organizations")) {
-    const demoOrganizations = SupabaseClientDB.getInitialDemoData("organizations")
-    SupabaseClientDB.setDemoData("organizations", demoOrganizations)
-  }
-
-  // Initialize admins
-  if (!localStorage.getItem("demo_admins")) {
-    const demoAdmins = SupabaseClientDB.getInitialDemoData("admins")
-    SupabaseClientDB.setDemoData("admins", demoAdmins)
-  }
-
-  // Initialize commerciaux
-  if (!localStorage.getItem("demo_commerciaux")) {
-    const demoCommerciaux = SupabaseClientDB.getInitialDemoData("commerciaux")
-    SupabaseClientDB.setDemoData("commerciaux", demoCommerciaux)
-  }
-
-  // Initialize contacts
-  if (!localStorage.getItem("demo_contacts")) {
-    const demoContacts = SupabaseClientDB.getInitialDemoData("contacts")
-    SupabaseClientDB.setDemoData("contacts", demoContacts)
-  }
-
-  // Initialize deals
-  if (!localStorage.getItem("demo_deals")) {
-    const demoDeals = SupabaseClientDB.getInitialDemoData("deals")
-    SupabaseClientDB.setDemoData("deals", demoDeals)
-  }
-
-  // Initialize appointments
-  if (!localStorage.getItem("demo_appointments")) {
-    const demoAppointments = SupabaseClientDB.getInitialDemoData("appointments")
-    SupabaseClientDB.setDemoData("appointments", demoAppointments)
-  }
-
-  // Initialize contracts
-  if (!localStorage.getItem("demo_contracts")) {
-    const demoContracts = SupabaseClientDB.getInitialDemoData("contracts")
-    SupabaseClientDB.setDemoData("contracts", demoContracts)
-  }
+  const dataTypes = ["organizations", "admins", "commerciaux", "contacts", "deals", "appointments", "contracts"]
+  
+  dataTypes.forEach(type => {
+    if (!localStorage.getItem(`demo_${type}`)) {
+      const demoData = SupabaseClientDB['getInitialDemoData'](type)
+      if (demoData.length > 0) {
+        localStorage.setItem(`demo_${type}`, JSON.stringify(demoData))
+      }
+    }
+  })
 }
 
-// Call initializeDemoData on page load
+// Initialiser les données de démo au chargement de la page
 if (typeof window !== "undefined") {
   window.addEventListener("load", initializeDemoData)
 }
+
+// Export pour compatibilité avec l'ancien code
+export { SupabaseClientDB as SupabaseDB }

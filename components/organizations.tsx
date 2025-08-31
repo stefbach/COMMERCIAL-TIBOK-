@@ -27,6 +27,7 @@ import type { Organization, ImportResult } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
 import { ImportModal } from "./import-modal"
 import { OrganizationDetailModal } from "./organization-detail-modal"
+import { CreateOrganizationModal } from "./create-organization-modal"
 
 function SupabaseDiagnostic() {
   const [connectionStatus, setConnectionStatus] = useState<string>("Checking...")
@@ -138,6 +139,7 @@ export function Organizations() {
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showDiagnostic, setShowDiagnostic] = useState(false)
@@ -148,6 +150,7 @@ export function Organizations() {
     secteur: "",
     district: "",
     categorie: "",
+    region: "",
     status: "",
     priority: "",
   })
@@ -168,7 +171,7 @@ export function Organizations() {
             name: "Hotel Le Mauricien",
             industry: "Hôtellerie",
             category: "4 étoiles",
-            region: "Port Louis",
+            region: "Ouest",
             district: "Port Louis",
             city: "Port Louis",
             address: "123 Royal Street",
@@ -191,7 +194,7 @@ export function Organizations() {
             name: "Resort Tropical Paradise",
             industry: "Hôtellerie",
             category: "5 étoiles",
-            region: "Grand Baie",
+            region: "Nord",
             district: "Rivière du Rempart",
             city: "Grand Baie",
             address: "456 Coastal Road",
@@ -222,6 +225,18 @@ export function Organizations() {
       setOrganizations([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateOrganization = async (orgData: Omit<Organization, "id" | "created_at" | "updated_at">) => {
+    try {
+      await SupabaseClientDB.createOrganization(orgData)
+      await loadData()
+      setShowCreateModal(false)
+      console.log("[v0] Organisation créée avec succès")
+    } catch (error) {
+      console.error("Erreur lors de la création de l'organisation:", error)
+      alert("Erreur lors de la création de l'organisation")
     }
   }
 
@@ -256,6 +271,7 @@ export function Organizations() {
       secteur: "",
       district: "",
       categorie: "",
+      region: "",
       status: "",
       priority: "",
     })
@@ -275,6 +291,7 @@ export function Organizations() {
       (!filters.secteur || org.secteur?.toLowerCase().includes(filters.secteur.toLowerCase())) &&
       (!filters.district || org.district?.toLowerCase().includes(filters.district.toLowerCase())) &&
       (!filters.categorie || org.category?.toLowerCase().includes(filters.categorie.toLowerCase())) &&
+      (!filters.region || org.region?.toLowerCase() === filters.region.toLowerCase()) &&
       (!filters.status || org.status?.toLowerCase() === filters.status.toLowerCase()) &&
       (!filters.priority || org.priority?.toLowerCase() === filters.priority.toLowerCase())
 
@@ -467,7 +484,10 @@ export function Organizations() {
             <Upload className="w-4 h-4 mr-2" />
             Import CSV/Excel
           </Button>
-          <Button className="bg-primary hover:bg-primary/90">
+          <Button 
+            className="bg-primary hover:bg-primary/90"
+            onClick={() => setShowCreateModal(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Ajouter Organisation
           </Button>
@@ -510,7 +530,7 @@ export function Organizations() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 p-4 bg-muted/50 rounded-lg">
             <Select value={filters.type} onValueChange={(value) => setFilters((prev) => ({ ...prev, type: value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Type" />
@@ -587,6 +607,23 @@ export function Organizations() {
                     {category}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.region}
+              onValueChange={(value) => setFilters((prev) => ({ ...prev, region: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Région" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les régions</SelectItem>
+                <SelectItem value="Nord">Nord</SelectItem>
+                <SelectItem value="Sud">Sud</SelectItem>
+                <SelectItem value="Est">Est</SelectItem>
+                <SelectItem value="Ouest">Ouest</SelectItem>
+                <SelectItem value="Centre">Centre</SelectItem>
               </SelectContent>
             </Select>
 
@@ -856,14 +893,16 @@ export function Organizations() {
       {filteredOrganizations.length === 0 && (
         <div className="text-center py-12">
           <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          {/* Changed subtitle color to blue */}
           <h3 className="text-lg font-semibold text-blue-600 mb-2">Aucune organisation trouvée</h3>
           <p className="text-muted-foreground mb-4">
             {searchTerm || Object.values(filters).some(Boolean)
               ? "Essayez d'ajuster vos termes de recherche ou filtres"
               : "Commencez par ajouter votre première organisation"}
           </p>
-          <Button className="bg-primary hover:bg-primary/90">
+          <Button 
+            className="bg-primary hover:bg-primary/90"
+            onClick={() => setShowCreateModal(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Ajouter Organisation
           </Button>
@@ -875,6 +914,12 @@ export function Organizations() {
         onClose={() => setShowImportModal(false)}
         onImport={handleImportOrganizations}
         type="organizations"
+      />
+
+      <CreateOrganizationModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateOrganization}
       />
 
       <OrganizationDetailModal

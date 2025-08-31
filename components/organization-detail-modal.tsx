@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Clock, MapPin, Plus, Save, X, Edit, Trash2, FileText } from "lucide-react"
+import { Calendar, Clock, MapPin, Plus, Save, X, Edit, Trash2, FileText, Upload, Download } from "lucide-react"
 import type { Organization, Appointment, Contract } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
 import { toast } from "sonner"
@@ -24,6 +24,15 @@ interface OrganizationDetailModalProps {
   onUpdate: () => void
 }
 
+// Statuts simplifiés - SYNCHRONISÉ avec contracts-tab.tsx
+const CONTRACT_STATUS_LABELS = {
+  "envoye": "Envoyé",
+  "signe": "Signé", 
+  "annule": "Annulé"
+} as const
+
+type ContractStatus = keyof typeof CONTRACT_STATUS_LABELS
+
 export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdate }: OrganizationDetailModalProps) {
   const [notes, setNotes] = useState("")
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -33,7 +42,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
   const [showContractForm, setShowContractForm] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
-  const [documents, setDocuments] = useState<Array<{ name: string; url: string; type: string }>>([])
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
   const [organizationForm, setOrganizationForm] = useState({
     name: "",
@@ -65,14 +74,12 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     status: "Scheduled" as const,
   })
 
+  // FORMULAIRE CONTRAT SYNCHRONISÉ avec contracts-tab.tsx
   const [contractForm, setContractForm] = useState({
-    title: "",
     description: "",
-    type: "Contrat de partenariat" as const,
-    status: "draft" as const,
-    assigned_to: "",
-    signed_date: "",
-    sent_date: "",
+    status: "envoye" as ContractStatus,
+    sentDate: "",
+    signatureDate: "",
   })
 
   useEffect(() => {
@@ -239,32 +246,87 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     }
   }
 
+  // GESTION FICHIERS SYNCHRONISÉE avec contracts-tab.tsx
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    const fileArray = Array.from(files)
+
+    const processedFiles = await Promise.all(
+      fileArray.map(async (file) => {
+        return new Promise<File>((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const processedFile = new File([file], file.name, { type: file.type })
+            ;(processedFile as any).base64 = reader.result
+            resolve(processedFile)
+          }
+          reader.readAsDataURL(file)
+        })
+      }),
+    )
+
+    setSelectedFiles((prev) => [...prev, ...processedFiles])
+  }
+
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const resetContractForm = () => {
     setContractForm({
-      title: "",
       description: "",
-      type: "Contrat de partenariat",
-      status: "draft",
-      assigned_to: "",
-      signed_date: "",
-      sent_date: "",
+      status: "envoye",
+      sentDate: "",
+      signatureDate: "",
     })
-    setDocuments([])
+    setSelectedFiles([])
     setShowContractForm(false)
     setEditingContract(null)
   }
 
+  // CRÉATION/MODIFICATION CONTRAT SYNCHRONISÉE avec contracts-tab.tsx
   const handleCreateContract = async () => {
     if (!organization) return
     setLoading(true)
     try {
-      const contractData = {
-        ...contractForm,
+      const documents = await Promise.all(
+        selectedFiles.map(async (file) => {
+          let base64Data = (file as any).base64
+
+          if (!base64Data) {
+            // Convert file to base64 if not already done
+            base64Data = await new Promise((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result)
+              reader.readAsDataURL(file)
+            })
+          }
+
+          return {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            uploadDate: new Date(),
+            data: base64Data,
+          }
+        }),
+      )
+
+      const contractData: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
+        description: contractForm.description,
         organization_id: organization.id,
+        contact_id: null,
+        status: contractForm.status,
+        assigned_to: "",
+        notes: "",
+        title: "",
+        value: 0,
         documents: documents,
-        signed_date:
-          contractForm.status === "signed" && contractForm.signed_date ? new Date(contractForm.signed_date) : undefined,
-        sent_date: contractForm.sent_date ? new Date(contractForm.sent_date) : undefined,
+        signed_date: contractForm.status === "signe" && contractForm.signatureDate 
+          ? new Date(contractForm.signatureDate) 
+          : undefined,
+        sent_date: contractForm.sentDate ? new Date(contractForm.sentDate) : undefined,
       }
 
       if (editingContract) {
@@ -288,15 +350,12 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
   const handleEditContract = (contract: Contract) => {
     setEditingContract(contract)
     setContractForm({
-      title: contract.title,
       description: contract.description || "",
-      type: contract.type || "Contrat de partenariat",
-      status: contract.status,
-      assigned_to: contract.assigned_to || "",
-      signed_date: contract.signed_date ? new Date(contract.signed_date).toISOString().split("T")[0] : "",
-      sent_date: contract.sent_date ? new Date(contract.sent_date).toISOString().split("T")[0] : "",
+      status: (contract.status as ContractStatus) || "envoye",
+      sentDate: contract.sent_date ? contract.sent_date.toISOString().split("T")[0] : "",
+      signatureDate: contract.signedDate ? contract.signedDate.toISOString().split("T")[0] : "",
     })
-    setDocuments(contract.documents || [])
+    setSelectedFiles([])
     setShowContractForm(true)
   }
 
@@ -316,26 +375,46 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     }
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files) return
-
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const newDocument = {
-          name: file.name,
-          url: e.target?.result as string,
-          type: file.type,
-        }
-        setDocuments((prev) => [...prev, newDocument])
+  // TÉLÉCHARGEMENT DOCUMENTS SYNCHRONISÉ avec contracts-tab.tsx
+  const downloadDocument = (doc: any) => {
+    try {
+      if (doc.data && doc.data.startsWith("data:")) {
+        const link = document.createElement("a")
+        link.href = doc.data
+        link.download = doc.name
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        console.log("[v0] Document downloaded:", doc.name)
+      } else if (doc.url) {
+        const link = document.createElement("a")
+        link.href = doc.url
+        link.download = doc.name
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        console.log("[v0] Document downloaded (fallback):", doc.name)
+      } else {
+        throw new Error("No valid download data found")
       }
-      reader.readAsDataURL(file)
-    })
+    } catch (error) {
+      console.error("[v0] Error downloading document:", error)
+      alert(`Erreur lors du téléchargement de ${doc.name}. Le fichier pourrait ne plus être disponible.`)
+    }
   }
 
-  const removeDocument = (index: number) => {
-    setDocuments((prev) => prev.filter((_, i) => i !== index))
+  // FONCTION COULEUR STATUT SYNCHRONISÉE avec contracts-tab.tsx
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case "signe":
+        return "bg-green-100 text-green-800"
+      case "envoye":
+        return "bg-blue-100 text-blue-800"
+      case "annule":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
   }
 
   if (!organization) return null
@@ -749,6 +828,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
             </div>
           </TabsContent>
 
+          {/* ONGLET CONTRATS COMPLÈTEMENT SYNCHRONISÉ avec contracts-tab.tsx */}
           <TabsContent value="contracts" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Contrats ({contracts.length})</h3>
@@ -771,68 +851,22 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="contract-title">Titre du contrat</Label>
-                      <Input
-                        id="contract-title"
-                        value={contractForm.title}
-                        onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
-                        placeholder="Titre du contrat"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="contract-type">Type de contrat</Label>
-                      <Select
-                        value={contractForm.type}
-                        onValueChange={(value: any) => setContractForm({ ...contractForm, type: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Contrat de partenariat">Contrat de partenariat</SelectItem>
-                          <SelectItem value="Contrat entreprise">Contrat entreprise</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
                       <Label htmlFor="contract-status">Statut</Label>
                       <Select
                         value={contractForm.status}
-                        onValueChange={(value: any) => setContractForm({ ...contractForm, status: value })}
+                        onValueChange={(value: ContractStatus) => setContractForm({ ...contractForm, status: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="draft">Brouillon</SelectItem>
-                          <SelectItem value="sent">Envoyé</SelectItem>
-                          <SelectItem value="contrat_envoye">Contrat Envoyé</SelectItem>
-                          <SelectItem value="signed">Signé</SelectItem>
-                          <SelectItem value="cancelled">Annulé</SelectItem>
+                          <SelectItem value="envoye">Envoyé</SelectItem>
+                          <SelectItem value="signe">Signé</SelectItem>
+                          <SelectItem value="annule">Annulé</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label htmlFor="assigned-to">Commercial assigné</Label>
-                      <Select
-                        value={contractForm.assigned_to}
-                        onValueChange={(value) => setContractForm({ ...contractForm, assigned_to: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un commercial" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Jean Dupont">Jean Dupont</SelectItem>
-                          <SelectItem value="Marie Martin">Marie Martin</SelectItem>
-                          <SelectItem value="Pierre Durand">Pierre Durand</SelectItem>
-                          <SelectItem value="Sophie Bernard">Sophie Bernard</SelectItem>
-                          <SelectItem value="Luc Moreau">Luc Moreau</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <div></div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -841,8 +875,8 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                       <Input
                         id="sent-date"
                         type="date"
-                        value={contractForm.sent_date}
-                        onChange={(e) => setContractForm({ ...contractForm, sent_date: e.target.value })}
+                        value={contractForm.sentDate}
+                        onChange={(e) => setContractForm({ ...contractForm, sentDate: e.target.value })}
                       />
                     </div>
                     <div>
@@ -850,8 +884,8 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                       <Input
                         id="signed-date"
                         type="date"
-                        value={contractForm.signed_date}
-                        onChange={(e) => setContractForm({ ...contractForm, signed_date: e.target.value })}
+                        value={contractForm.signatureDate}
+                        onChange={(e) => setContractForm({ ...contractForm, signatureDate: e.target.value })}
                       />
                     </div>
                   </div>
@@ -863,31 +897,60 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                       value={contractForm.description}
                       onChange={(e) => setContractForm({ ...contractForm, description: e.target.value })}
                       placeholder="Description du contrat"
+                      rows={3}
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="contract-documents">Documents du contrat</Label>
-                    <div className="space-y-2">
-                      <Input
-                        id="contract-documents"
-                        type="file"
-                        multiple
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        onChange={handleFileUpload}
-                        className="cursor-pointer"
-                      />
-                      {documents.length > 0 && (
+                    <Label>Documents du contrat</Label>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="file"
+                          multiple
+                          accept=".pdf,.doc,.docx,.txt,.jpg,.png"
+                          onChange={(e) => handleFileUpload(e.target.files)}
+                          className="flex-1"
+                        />
+                        <Button type="button" variant="outline" size="sm">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Télécharger
+                        </Button>
+                      </div>
+
+                      {selectedFiles.length > 0 && (
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Documents sélectionnés :</p>
-                          {documents.map((doc, index) => (
-                            <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                              <div className="flex items-center">
-                                <FileText className="w-4 h-4 mr-2" />
-                                <span className="text-sm">{doc.name}</span>
+                          <p className="text-sm font-medium">Fichiers sélectionnés :</p>
+                          {selectedFiles.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                <span className="text-sm">{file.name}</span>
+                                <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => removeDocument(index)}>
-                                <X className="w-4 h-4" />
+                              <Button type="button" variant="ghost" size="sm" onClick={() => removeSelectedFile(index)}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {editingContract && editingContract.documents && editingContract.documents.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">Documents existants :</p>
+                          {editingContract.documents.map((doc, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-blue-50 rounded">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                <span className="text-sm">{doc.name}</span>
+                                <span className="text-xs text-gray-500">({(doc.size / 1024).toFixed(1)} KB)</span>
+                                <Badge variant="outline" className="text-xs px-1 py-0">
+                                  {doc.type?.split("/")[1]?.toUpperCase() || "FILE"}
+                                </Badge>
+                              </div>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => downloadDocument(doc)}>
+                                <Download className="h-4 w-4" />
                               </Button>
                             </div>
                           ))}
@@ -905,55 +968,96 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
             )}
 
             <div className="space-y-4">
-              {contracts.map((contract) => (
-                <Card key={contract.id}>
-                  <CardContent className="pt-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-semibold">{contract.title}</h4>
-                        <p className="text-sm text-muted-foreground">{contract.description}</p>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                          <span>Type: {contract.type || "Non spécifié"}</span>
-                          <span>Assigné à: {contract.assigned_to || "Non assigné"}</span>
-                          {contract.sent_date && (
-                            <span>Envoyé le: {new Date(contract.sent_date).toLocaleDateString()}</span>
-                          )}
-                          {contract.signed_date && (
-                            <span>Signé le: {new Date(contract.signed_date).toLocaleDateString()}</span>
+              {contracts.map((contract) => {
+                const organizationId = (contract as any).organization_id || contract.organizationId
+                
+                return (
+                  <Card key={contract.id}>
+                    <CardContent className="pt-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <Badge className={getStatusBadgeColor(contract.status)}>
+                              {CONTRACT_STATUS_LABELS[contract.status as ContractStatus] || contract.status}
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              <span className="text-blue-700 font-medium">
+                                Organisation: {organization?.name}
+                              </span>
+                            </div>
+                            {contract.sent_date && (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                <span>Envoyé le: {new Date(contract.sent_date).toLocaleDateString("fr-FR")}</span>
+                              </div>
+                            )}
+                            {contract.signedDate && (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                <span>Signé le: {new Date(contract.signedDate).toLocaleDateString("fr-FR")}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {contract.description && <p className="mt-2 text-sm text-gray-700">{contract.description}</p>}
+
+                          {contract.documents && contract.documents.length > 0 && (
+                            <div className="mt-3 p-3 bg-gray-50 rounded">
+                              <p className="text-sm font-medium mb-2">Documents ({contract.documents.length}) :</p>
+                              <div className="space-y-1">
+                                {contract.documents.map((doc, index) => (
+                                  <div key={index} className="flex items-center justify-between text-sm">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-3 w-3" />
+                                      <span>{doc.name}</span>
+                                      <span className="text-xs text-gray-500">({(doc.size / 1024).toFixed(1)} KB)</span>
+                                      <Badge variant="outline" className="text-xs px-1 py-0">
+                                        {doc.type?.split("/")[1]?.toUpperCase() || "FILE"}
+                                      </Badge>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 hover:bg-blue-100"
+                                      onClick={() => downloadDocument(doc)}
+                                      title={`Télécharger ${doc.name}`}
+                                    >
+                                      <Download className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
-                        {contract.documents && contract.documents.length > 0 && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <FileText className="w-4 h-4" />
-                            <span className="text-sm text-muted-foreground">
-                              {contract.documents.length} document(s) attaché(s)
-                            </span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditContract(contract)}
+                            disabled={loading}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteContract(contract.id)}
+                            disabled={loading}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{contract.status}</Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditContract(contract)}
-                          disabled={loading}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteContract(contract.id)}
-                          disabled={loading}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
 
               {contracts.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">Aucun contrat enregistré</div>

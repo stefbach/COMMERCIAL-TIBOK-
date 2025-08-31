@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, FileText, User, Trash2, Edit, Plus, Upload, Download, X } from "lucide-react"
-import { type Contract, type Organization, type Contact, CONTRACT_STATUS_LABELS } from "@/types/crm"
+import { Calendar, FileText, Trash2, Edit, Plus, Upload, Download, X } from "lucide-react"
+import { type Contract, type Organization, type Contact } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
 
 interface ContractsTabProps {
@@ -18,7 +18,14 @@ interface ContractsTabProps {
   contacts: Contact[]
 }
 
-const commercialUsers = ["Jean Dupont", "Marie Martin", "Pierre Durand", "Sophie Leroy", "Antoine Bernard"]
+// Statuts simplifiés
+const CONTRACT_STATUS_LABELS = {
+  "envoye": "Envoyé",
+  "signe": "Signé", 
+  "annule": "Annulé"
+} as const
+
+type ContractStatus = keyof typeof CONTRACT_STATUS_LABELS
 
 export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
   const [contracts, setContracts] = useState<Contract[]>([])
@@ -26,21 +33,20 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
   const [showForm, setShowForm] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [showMigrationAlert, setShowMigrationAlert] = useState(false)
+  
   const [filters, setFilters] = useState({
     status: "all",
-    assignedTo: "all",
     organization: "all",
   })
+  
   const [formData, setFormData] = useState({
-    title: "",
     description: "",
     organizationId: "",
-    contactId: "",
-    status: "draft",
-    assignedTo: commercialUsers[0] || "Jean Dupont",
+    status: "envoye" as ContractStatus,
+    sentDate: "",
     signatureDate: "",
-    notes: "",
   })
+  
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
   useEffect(() => {
@@ -68,15 +74,13 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     setLoading(true)
 
     try {
-      const assignedToValue = formData.assignedTo?.trim() || commercialUsers[0] || "Jean Dupont"
-
-      if (!assignedToValue) {
-        alert("Erreur: Impossible de déterminer le commercial assigné.")
+      if (!formData.organizationId) {
+        alert("Erreur: Organisation obligatoire.")
         setLoading(false)
         return
       }
 
-      console.log("[v0] Creating contract with assigned_to:", assignedToValue)
+      console.log("[v0] Creating contract with data:", formData)
 
       const documents = await Promise.all(
         selectedFiles.map(async (file) => {
@@ -96,23 +100,25 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
             size: file.size,
             type: file.type,
             uploadDate: new Date(),
-            data: base64Data, // Store base64 data instead of blob URL
+            data: base64Data,
           }
         }),
       )
 
       const contractData: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
-        title: formData.title,
         description: formData.description,
-        organization_id: formData.organizationId || null,
-        contact_id: formData.contactId || null,
+        organization_id: formData.organizationId,
+        contact_id: null, // Supprimé
         status: formData.status,
-        assigned_to: assignedToValue,
-        notes: formData.notes,
+        assigned_to: "", // Supprimé
+        notes: "", // Supprimé
+        title: "", // Supprimé
         value: 0,
         documents: documents,
-        signed_date:
-          formData.status === "signed" && formData.signatureDate ? new Date(formData.signatureDate) : undefined,
+        signed_date: formData.status === "signe" && formData.signatureDate 
+          ? new Date(formData.signatureDate) 
+          : undefined,
+        sent_date: formData.sentDate ? new Date(formData.sentDate) : undefined,
       }
 
       console.log("[v0] Contract data being sent:", contractData)
@@ -156,7 +162,6 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         return new Promise<File>((resolve) => {
           const reader = new FileReader()
           reader.onload = () => {
-            // Store file with base64 data for persistence
             const processedFile = new File([file], file.name, { type: file.type })
             ;(processedFile as any).base64 = reader.result
             resolve(processedFile)
@@ -175,14 +180,11 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
 
   const resetForm = () => {
     setFormData({
-      title: "",
       description: "",
       organizationId: "",
-      contactId: "",
-      status: "draft",
-      assignedTo: commercialUsers[0] || "Jean Dupont",
+      status: "envoye",
+      sentDate: "",
       signatureDate: "",
-      notes: "",
     })
     setSelectedFiles([])
     setShowForm(false)
@@ -192,33 +194,24 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
   const startEdit = (contract: Contract) => {
     setEditingContract(contract)
     setFormData({
-      title: contract.title,
-      description: contract.description,
-      organizationId: contract.organizationId,
-      contactId: contract.contactId,
-      status: contract.status,
-      assignedTo: contract.assignedTo,
+      description: contract.description || "",
+      organizationId: contract.organizationId || "",
+      status: (contract.status as ContractStatus) || "envoye",
+      sentDate: contract.sent_date ? contract.sent_date.toISOString().split("T")[0] : "",
       signatureDate: contract.signedDate ? contract.signedDate.toISOString().split("T")[0] : "",
-      notes: contract.notes,
     })
     setSelectedFiles([])
     setShowForm(true)
   }
 
-  const getStatusBadgeColor = (status: Contract["status"]) => {
+  const getStatusBadgeColor = (status: string) => {
     switch (status) {
-      case "signed":
+      case "signe":
         return "bg-green-100 text-green-800"
-      case "sent":
+      case "envoye":
         return "bg-blue-100 text-blue-800"
-      case "contrat_envoye":
-        return "bg-purple-100 text-purple-800"
-      case "draft":
-        return "bg-gray-100 text-gray-800"
-      case "cancelled":
+      case "annule":
         return "bg-red-100 text-red-800"
-      case "expired":
-        return "bg-orange-100 text-orange-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -226,7 +219,6 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
 
   const filteredContracts = contracts.filter((contract) => {
     if (filters.status !== "all" && contract.status !== filters.status) return false
-    if (filters.assignedTo !== "all" && contract.assignedTo !== filters.assignedTo) return false
     if (filters.organization !== "all" && contract.organizationId !== filters.organization) return false
     return true
   })
@@ -246,19 +238,9 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     return organizations.find((o) => o.id.toString() === orgId)
   }
 
-  const getContactName = (contactId: string) => {
-    const contact = contacts.find((c) => c.id.toString() === contactId)
-    if (!contact) {
-      console.log(`[v0] Contact not found for ID: ${contactId}`)
-      return `Contact introuvable (ID: ${contactId})`
-    }
-    return contact.fullName
-  }
-
   const downloadDocument = (doc: any) => {
     try {
       if (doc.data && doc.data.startsWith("data:")) {
-        // Create download link from base64 data
         const link = document.createElement("a")
         link.href = doc.data
         link.download = doc.name
@@ -267,7 +249,6 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         document.body.removeChild(link)
         console.log("[v0] Document downloaded:", doc.name)
       } else if (doc.url) {
-        // Fallback for old blob URLs
         const link = document.createElement("a")
         link.href = doc.url
         link.download = doc.name
@@ -318,7 +299,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-blue-600">Gestion des Contrats</h2>
-          <p className="text-gray-600">Gérez vos contrats et leur affectation aux commerciaux</p>
+          <p className="text-gray-600">Gérez vos contrats et leur suivi</p>
           <p className="text-sm text-blue-600">{organizations.length} organisation(s) disponible(s) pour liaison</p>
         </div>
         <Button
@@ -336,7 +317,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
           <CardTitle className="text-lg">Filtres</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Statut</Label>
               <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
@@ -345,31 +326,9 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="draft">Brouillon</SelectItem>
-                  <SelectItem value="sent">Envoyé</SelectItem>
-                  <SelectItem value="contrat_envoye">Contrat Envoyé</SelectItem>
-                  <SelectItem value="signed">Signé</SelectItem>
-                  <SelectItem value="cancelled">Annulé</SelectItem>
-                  <SelectItem value="expired">Expiré</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Commercial</Label>
-              <Select
-                value={filters.assignedTo}
-                onValueChange={(value) => setFilters({ ...filters, assignedTo: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les commerciaux</SelectItem>
-                  {Array.from(new Set(contracts.map((c) => c.assignedTo))).map((commercial) => (
-                    <SelectItem key={commercial} value={commercial}>
-                      {commercial}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="envoye">Envoyé</SelectItem>
+                  <SelectItem value="signe">Signé</SelectItem>
+                  <SelectItem value="annule">Annulé</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -405,15 +364,6 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="title">Titre du contrat</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
                   <Label htmlFor="organization">Organisation *</Label>
                   <Select
                     value={formData.organizationId}
@@ -442,64 +392,29 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                   </p>
                 </div>
                 <div>
-                  <Label htmlFor="contact">Contact</Label>
-                  <Select
-                    value={formData.contactId}
-                    onValueChange={(value) => setFormData({ ...formData, contactId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un contact" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contacts
-                        .filter(
-                          (c) => !formData.organizationId || c.organizationId.toString() === formData.organizationId,
-                        )
-                        .map((contact) => (
-                          <SelectItem key={contact.id} value={contact.id.toString()}>
-                            {contact.fullName}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
                   <Label htmlFor="status">Statut</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value: Contract["status"]) => setFormData({ ...formData, status: value })}
+                    onValueChange={(value: ContractStatus) => setFormData({ ...formData, status: value })}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="draft">Brouillon</SelectItem>
-                      <SelectItem value="sent">Envoyé</SelectItem>
-                      <SelectItem value="contrat_envoye">Contrat Envoyé</SelectItem>
-                      <SelectItem value="signed">Signé</SelectItem>
-                      <SelectItem value="cancelled">Annulé</SelectItem>
-                      <SelectItem value="expired">Expiré</SelectItem>
+                      <SelectItem value="envoye">Envoyé</SelectItem>
+                      <SelectItem value="signe">Signé</SelectItem>
+                      <SelectItem value="annule">Annulé</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="assignedTo">Commercial assigné</Label>
-                  <Select
-                    value={formData.assignedTo}
-                    onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un commercial" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {commercialUsers.map((commercial) => (
-                        <SelectItem key={commercial} value={commercial}>
-                          {commercial}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="sentDate">Date d'envoi</Label>
+                  <Input
+                    id="sentDate"
+                    type="date"
+                    value={formData.sentDate}
+                    onChange={(e) => setFormData({ ...formData, sentDate: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="signatureDate">Date de signature</Label>
@@ -518,15 +433,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
-                />
-              </div>
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={2}
+                  placeholder="Description du contrat..."
                 />
               </div>
               <div>
@@ -607,8 +514,6 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         ) : (
           filteredContracts.map((contract) => {
             const organizationId = (contract as any).organization_id || contract.organizationId
-            const contactId = (contract as any).contact_id || contract.contactId
-            const assignedTo = (contract as any).assigned_to || contract.assignedTo
             const organization = getOrganizationDetails(organizationId)
 
             return (
@@ -655,32 +560,27 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold">{contract.title}</h3>
                         <Badge className={getStatusBadgeColor(contract.status)}>
-                          {CONTRACT_STATUS_LABELS[contract.status]}
+                          {CONTRACT_STATUS_LABELS[contract.status as ContractStatus] || contract.status}
                         </Badge>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
                           <span className="text-blue-700 font-medium">
                             Organisation: {getOrganizationName(organizationId)}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          <span>Commercial: {assignedTo}</span>
-                        </div>
+                        {contract.sent_date && (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>Envoyé le: {new Date(contract.sent_date).toLocaleDateString("fr-FR")}</span>
+                          </div>
+                        )}
                         {contract.signedDate && (
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            <span>Signé le: {new Date(contract.signedDate).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {contactId && contacts.find((c) => c.id.toString() === contactId) && (
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <User className="h-3 w-3" />
-                            <span>Contact: {getContactName(contactId)}</span>
+                            <span>Signé le: {new Date(contract.signedDate).toLocaleDateString("fr-FR")}</span>
                           </div>
                         )}
                       </div>
