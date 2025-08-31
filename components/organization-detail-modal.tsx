@@ -44,6 +44,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
+  // Formulaire avec SEULEMENT les champs qui existent dans la table
   const [organizationForm, setOrganizationForm] = useState({
     name: "",
     industry: "",
@@ -59,9 +60,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     phone: "",
     email: "",
     contact_principal: "",
-    contact_fonction: "",
-    status: "Active" as const,
-    priority: "Medium" as const,
+    status: "active" as const,
   })
 
   const [appointmentForm, setAppointmentForm] = useState({
@@ -100,9 +99,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         phone: organization.phone || "",
         email: organization.email || "",
         contact_principal: organization.contact_principal || "",
-        contact_fonction: organization.contact_fonction || "",
-        status: organization.status || "Active",
-        priority: organization.priority || "Medium",
+        status: organization.status || "active",
       })
       loadAppointments()
       loadContracts()
@@ -602,18 +599,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                 />
               </div>
               <div>
-                <Label htmlFor="contact_fonction">Fonction du contact</Label>
-                <Input
-                  id="contact_fonction"
-                  value={organizationForm.contact_fonction}
-                  onChange={(e) => setOrganizationForm({ ...organizationForm, contact_fonction: e.target.value })}
-                  placeholder="Fonction/Poste"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
                 <Label htmlFor="status">Statut</Label>
                 <Select
                   value={organizationForm.status}
@@ -623,26 +608,10 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Active">Actif</SelectItem>
-                    <SelectItem value="Inactive">Inactif</SelectItem>
-                    <SelectItem value="Prospect">Prospect</SelectItem>
-                    <SelectItem value="Client">Client</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="priority">Priorité</Label>
-                <Select
-                  value={organizationForm.priority}
-                  onValueChange={(value: any) => setOrganizationForm({ ...organizationForm, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Faible</SelectItem>
-                    <SelectItem value="Medium">Moyenne</SelectItem>
-                    <SelectItem value="High">Élevée</SelectItem>
+                    <SelectItem value="active">Actif</SelectItem>
+                    <SelectItem value="inactive">Inactif</SelectItem>
+                    <SelectItem value="prospect">Prospect</SelectItem>
+                    <SelectItem value="client">Client</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
