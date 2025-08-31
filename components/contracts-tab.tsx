@@ -56,14 +56,19 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     }
   }, [organizations])
 
+  // ✅ GESTION D'ERREURS ROBUSTE comme dans documents-management
   const loadContracts = async () => {
     try {
-      console.log("[v0] Loading contracts...")
+      setLoading(true)
+      console.log("[CONTRACTS] Loading contracts...")
       const data = await SupabaseClientDB.getContracts()
-      console.log("[v0] Contracts loaded:", data)
+      console.log("[CONTRACTS] Contracts loaded:", data.length, "contracts")
       setContracts(data)
     } catch (error) {
-      console.error("[v0] Error loading contracts:", error)
+      console.error("[CONTRACTS] Error loading contracts:", error)
+      // FALLBACK vers des données de démo ou tableau vide
+      console.log("[CONTRACTS] Using fallback - empty array")
+      setContracts([])
     } finally {
       setLoading(false)
     }
@@ -80,14 +85,13 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         return
       }
 
-      console.log("[v0] Creating contract with data:", formData)
+      console.log("[CONTRACTS] Creating contract with data:", formData)
 
       const documents = await Promise.all(
         selectedFiles.map(async (file) => {
           let base64Data = (file as any).base64
 
           if (!base64Data) {
-            // Convert file to base64 if not already done
             base64Data = await new Promise((resolve) => {
               const reader = new FileReader()
               reader.onload = () => resolve(reader.result)
@@ -105,36 +109,43 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         }),
       )
 
-      const contractData: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
+      // ✅ STRUCTURE SIMPLIFIÉE - Seulement les champs essentiels
+      const contractData = {
         description: formData.description,
         organization_id: formData.organizationId,
-        contact_id: null, // Supprimé
+        contact_id: null,
         status: formData.status,
-        assigned_to: "", // Supprimé
-        notes: "", // Supprimé
-        title: "", // Supprimé
+        assigned_to: "",
+        notes: "",
         value: 0,
         documents: documents,
         signed_date: formData.status === "signe" && formData.signatureDate 
           ? new Date(formData.signatureDate) 
-          : undefined,
-        sent_date: formData.sentDate ? new Date(formData.sentDate) : undefined,
+          : null,
+        sent_date: formData.sentDate ? new Date(formData.sentDate) : null,
       }
 
-      console.log("[v0] Contract data being sent:", contractData)
+      console.log("[CONTRACTS] Contract input prepared:", contractData)
 
+      let result
       if (editingContract) {
-        await SupabaseClientDB.updateContract(editingContract.id, contractData)
-        console.log("[v0] Contract updated successfully")
+        result = await SupabaseClientDB.updateContract(editingContract.id, contractData)
+        console.log("[CONTRACTS] Contract updated successfully")
       } else {
-        await SupabaseClientDB.createContract(contractData)
-        console.log("[v0] Contract created successfully")
+        result = await SupabaseClientDB.createContract(contractData)
+        console.log("[CONTRACTS] Contract created successfully")
       }
 
       await loadContracts()
       resetForm()
     } catch (error) {
-      console.error("[v0] Error saving contract:", error)
+      console.error("[CONTRACTS] Error saving contract:", error)
+      // ✅ GESTION D'ERREUR DÉTAILLÉE
+      if (error.message) {
+        alert(`Erreur lors de la sauvegarde: ${error.message}`)
+      } else {
+        alert("Erreur lors de la sauvegarde du contrat")
+      }
     } finally {
       setLoading(false)
     }
@@ -145,10 +156,11 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
 
     try {
       await SupabaseClientDB.deleteContract(contractId)
-      console.log("[v0] Contract deleted successfully")
+      console.log("[CONTRACTS] Contract deleted successfully")
       await loadContracts()
     } catch (error) {
-      console.error("[v0] Error deleting contract:", error)
+      console.error("[CONTRACTS] Error deleting contract:", error)
+      alert("Erreur lors de la suppression")
     }
   }
 
@@ -195,10 +207,10 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
     setEditingContract(contract)
     setFormData({
       description: contract.description || "",
-      organizationId: contract.organizationId || "",
+      organizationId: contract.organization_id || "",
       status: (contract.status as ContractStatus) || "envoye",
       sentDate: contract.sent_date ? contract.sent_date.toISOString().split("T")[0] : "",
-      signatureDate: contract.signedDate ? contract.signedDate.toISOString().split("T")[0] : "",
+      signatureDate: contract.signed_date ? contract.signed_date.toISOString().split("T")[0] : "",
     })
     setSelectedFiles([])
     setShowForm(true)
@@ -219,15 +231,15 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
 
   const filteredContracts = contracts.filter((contract) => {
     if (filters.status !== "all" && contract.status !== filters.status) return false
-    if (filters.organization !== "all" && contract.organizationId !== filters.organization) return false
+    if (filters.organization !== "all" && contract.organization_id !== filters.organization) return false
     return true
   })
 
   const getOrganizationName = (orgId: string) => {
     if (!orgId) return "Aucune organisation"
-    const org = organizations.find((o) => o.id.toString() === orgId)
+    const org = organizations.find((o) => o.id === orgId)
     if (!org) {
-      console.log(`[v0] Organization not found for ID: ${orgId}`)
+      console.log(`[CONTRACTS] Organization not found for ID: ${orgId}`)
       return `Organisation #${orgId.substring(0, 8)}...`
     }
     return org.name
@@ -235,7 +247,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
 
   const getOrganizationDetails = (orgId: string) => {
     if (!orgId) return null
-    return organizations.find((o) => o.id.toString() === orgId)
+    return organizations.find((o) => o.id === orgId)
   }
 
   const downloadDocument = (doc: any) => {
@@ -247,7 +259,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        console.log("[v0] Document downloaded:", doc.name)
+        console.log("[CONTRACTS] Document downloaded:", doc.name)
       } else if (doc.url) {
         const link = document.createElement("a")
         link.href = doc.url
@@ -255,18 +267,24 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        console.log("[v0] Document downloaded (fallback):", doc.name)
+        console.log("[CONTRACTS] Document downloaded (fallback):", doc.name)
       } else {
         throw new Error("No valid download data found")
       }
     } catch (error) {
-      console.error("[v0] Error downloading document:", error)
+      console.error("[CONTRACTS] Error downloading document:", error)
       alert(`Erreur lors du téléchargement de ${doc.name}. Le fichier pourrait ne plus être disponible.`)
     }
   }
 
   if (loading && contracts.length === 0) {
-    return <div className="p-4">Chargement des contrats...</div>
+    return (
+      <div className="p-4">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">Chargement des contrats...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -344,7 +362,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                 <SelectContent>
                   <SelectItem value="all">Toutes les organisations</SelectItem>
                   {organizations.map((org) => (
-                    <SelectItem key={org.id} value={org.id.toString()}>
+                    <SelectItem key={org.id} value={org.id}>
                       {org.name}
                     </SelectItem>
                   ))}
@@ -380,7 +398,7 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                         </SelectItem>
                       ) : (
                         organizations.map((org) => (
-                          <SelectItem key={org.id} value={org.id.toString()}>
+                          <SelectItem key={org.id} value={org.id}>
                             {org.name}
                           </SelectItem>
                         ))
@@ -509,11 +527,13 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
       <div className="grid gap-4">
         {filteredContracts.length === 0 ? (
           <Card>
-            <CardContent className="p-6 text-center text-gray-500">Aucun contrat trouvé</CardContent>
+            <CardContent className="p-6 text-center text-gray-500">
+              {loading ? "Chargement..." : "Aucun contrat trouvé"}
+            </CardContent>
           </Card>
         ) : (
           filteredContracts.map((contract) => {
-            const organizationId = (contract as any).organization_id || contract.organizationId
+            const organizationId = contract.organization_id
             const organization = getOrganizationDetails(organizationId)
 
             return (
@@ -577,10 +597,10 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
                             <span>Envoyé le: {new Date(contract.sent_date).toLocaleDateString("fr-FR")}</span>
                           </div>
                         )}
-                        {contract.signedDate && (
+                        {contract.signed_date && (
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            <span>Signé le: {new Date(contract.signedDate).toLocaleDateString("fr-FR")}</span>
+                            <span>Signé le: {new Date(contract.signed_date).toLocaleDateString("fr-FR")}</span>
                           </div>
                         )}
                       </div>
