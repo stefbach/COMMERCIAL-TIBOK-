@@ -211,8 +211,21 @@ export function Dashboard() {
   const calculateDistrictGroups = (orgs: Organization[], appointments: any[], contracts: any[]) => {
     const districtMap = new Map<string, DistrictGroup>()
 
+    console.log("[Dashboard] Calculating districts for", orgs.length, "organizations")
+    
+    // Debug: Vérifier quelques organisations pour voir leurs champs district et region
+    orgs.slice(0, 3).forEach((org, index) => {
+      console.log(`[Dashboard] Org ${index}:`, {
+        name: org.name,
+        district: org.district,
+        region: org.region,
+        zone_geographique: org.zone_geographique
+      })
+    })
+
     orgs.forEach(org => {
-      const district = org.district?.trim() || 'Non défini'
+      // Récupérer le district depuis district OU region (les deux peuvent contenir l'info district)
+      const district = (org.district?.trim() || org.region?.trim() || 'Non défini')
       
       if (districtMap.has(district)) {
         const existing = districtMap.get(district)!
@@ -223,12 +236,14 @@ export function Dashboard() {
           district,
           count: 1,
           organizations: [org],
-          zone: org.zone_geographique || org.region,
+          zone: org.zone_geographique, // Zone géographique séparée
           appointmentCount: 0,
           contractCount: 0
         })
       }
     })
+
+    console.log("[Dashboard] Districts found:", Array.from(districtMap.keys()))
 
     // Calculer les appointments et contrats pour chaque district
     districtMap.forEach((group, district) => {
@@ -244,6 +259,7 @@ export function Dashboard() {
     })
 
     const groups = Array.from(districtMap.values())
+    console.log("[Dashboard] District groups created:", groups.length)
     groups.sort((a, b) => b.count - a.count)
     setDistrictGroups(groups)
   }
@@ -260,9 +276,10 @@ export function Dashboard() {
         })
         break
       case "district":
-        filteredOrganizations = organizations.filter(org => 
-          (org.district?.trim() || 'Non défini') === name
-        )
+        filteredOrganizations = organizations.filter(org => {
+          const orgDistrict = org.district?.trim() || org.region?.trim() || 'Non défini'
+          return orgDistrict === name
+        })
         break
     }
 
