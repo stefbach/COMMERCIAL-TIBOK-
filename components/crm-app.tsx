@@ -6,6 +6,7 @@ import { Dashboard } from "@/components/dashboard"
 import { Organizations } from "@/components/organizations"
 import { AppointmentsTab } from "@/components/appointments-tab"
 import { ContractsTab } from "@/components/contracts-tab"
+import { DocumentsManagement } from "@/components/documents-management"
 import { UsersManagement } from "@/components/users-management"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -161,6 +162,8 @@ export default function CRMApp({ initialUser }: CRMAppProps) {
             <ContractsTab contacts={contacts} organizations={organizations} />
           </div>
         )
+      case "documents":
+        return <DocumentsManagement />
       case "users":
         return (
           <div className="p-6">
