@@ -109,20 +109,18 @@ export function ContractsTab({ organizations, contacts }: ContractsTabProps) {
         }),
       )
 
-      // ✅ STRUCTURE SIMPLIFIÉE - Seulement les champs essentiels
+      // ✅ STRUCTURE EXACTE - Correspondant à votre table contracts
       const contractData = {
-        description: formData.description,
         organization_id: formData.organizationId,
         contact_id: null,
+        description: formData.description,
         status: formData.status,
-        assigned_to: "",
-        notes: "",
-        value: 0,
-        documents: documents,
         signed_date: formData.status === "signe" && formData.signatureDate 
           ? new Date(formData.signatureDate) 
           : null,
+        notes: "",
         sent_date: formData.sentDate ? new Date(formData.sentDate) : null,
+        documents: documents,
       }
 
       console.log("[CONTRACTS] Contract input prepared:", contractData)
