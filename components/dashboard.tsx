@@ -22,7 +22,7 @@ import {
   DollarSign,
   Trophy
 } from "lucide-react"
-import type { Organization } from "@/types/crm"
+import type { Organization, Contract } from "@/types/crm"
 import { SupabaseClientDB } from "@/lib/supabase-db"
 
 interface DashboardStats {
@@ -83,6 +83,7 @@ export function Dashboard() {
   const [selectedZone, setSelectedZone] = useState<ZoneDetails | null>(null)
   const [allAppointments, setAllAppointments] = useState<any[]>([])
   const [allContracts, setAllContracts] = useState<any[]>([])
+  const [recentContracts, setRecentContracts] = useState<any[]>([])
 
   useEffect(() => {
     loadDashboardData()
@@ -104,6 +105,12 @@ export function Dashboard() {
       setOrganizations(orgs)
       setAllAppointments(appointments)
       setAllContracts(contracts)
+      
+      // ✅ AJOUT : Récupérer les 5 contrats les plus récents
+      const sortedContracts = contracts
+        .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
+        .slice(0, 5)
+      setRecentContracts(sortedContracts)
       
       calculateStats(orgs, appointments, contracts)
       calculateGeographicalGroups(orgs, appointments, contracts)
@@ -348,6 +355,38 @@ export function Dashboard() {
         return 'bg-gray-100 text-gray-800'
       default:
         return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  // ✅ AJOUT : Fonctions pour les contrats
+  const getContractStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'signed':
+        return 'bg-green-100 text-green-800'
+      case 'sent':
+      case 'contrat_envoye':
+        return 'bg-blue-100 text-blue-800'
+      case 'draft':
+      case 'brouillon':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'cancelled':
+      case 'annule':
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getContractStatusLabel = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'signed': return 'Signé'
+      case 'sent': return 'Envoyé'
+      case 'contrat_envoye': return 'Envoyé'
+      case 'draft': return 'Brouillon'
+      case 'brouillon': return 'Brouillon'
+      case 'cancelled': return 'Annulé'
+      case 'annule': return 'Annulé'
+      default: return status || 'Non défini'
     }
   }
 
@@ -596,6 +635,76 @@ export function Dashboard() {
               </div>
             </TabsContent>
           </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* ✅ AJOUT : Section Contrats Récents */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            Contrats Récents
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentContracts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="w-8 h-8 mx-auto mb-2" />
+              <p>Aucun contrat trouvé</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {recentContracts.map((contract, index) => (
+                <div key={contract.id || index} className="p-4 border rounded-lg hover:shadow-sm transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm">
+                        {contract.title || `Contrat #${contract.id?.slice(-6) || index + 1}`}
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        {contract.organization_name || 'Organisation non spécifiée'}
+                      </p>
+                    </div>
+                    <Badge className={getContractStatusColor(contract.status)} variant="secondary">
+                      {getContractStatusLabel(contract.status)}
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Valeur:</span>
+                      <span className="ml-2 font-medium">
+                        {contract.value ? `${contract.value.toLocaleString()} MUR` : 'Non définie'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Créé le:</span>
+                      <span className="ml-2">
+                        {contract.created_at ? 
+                          new Date(contract.created_at).toLocaleDateString('fr-FR') : 
+                          'Date inconnue'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {contract.notes && (
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="text-xs text-gray-600 line-clamp-2">{contract.notes}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {allContracts.length > 5 && (
+                <div className="text-center pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    ... et {allContracts.length - 5} autres contrats
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
