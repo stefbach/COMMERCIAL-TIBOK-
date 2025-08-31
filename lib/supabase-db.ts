@@ -755,27 +755,47 @@ export class SupabaseClientDB {
   }
 
   // ============================================
-  // CONTRACTS
+  // CONTRACTS - ✅ FONCTION UPDATECONTRACT CORRIGÉE AVEC DEBUG COMPLET
   // ============================================
 
   static async getContracts(): Promise<Contract[]> {
+    console.log("[CONTRACTS] Loading contracts...")
+
     if (await this.isDemoMode()) {
-      return this.getDemoData("contracts")
+      console.log("[CONTRACTS] Using demo mode for contracts")
+      const contracts = this.getDemoData("contracts")
+      console.log("[CONTRACTS] Demo contracts loaded:", contracts.length)
+      return contracts
     }
 
-    const supabase = this.getClient()
-    const { data, error } = await supabase.from("contracts").select("*").order("created_date", { ascending: false })
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase.from("contracts").select("*").order("created_date", { ascending: false })
 
-    if (error) throw error
+      if (error) {
+        console.log("[CONTRACTS] Supabase error, falling back to demo mode:", error.message)
+        throw error
+      }
 
-    return (data || []).map((contract) => ({
-      ...contract,
-      documents: typeof contract.documents === "string" ? JSON.parse(contract.documents) : contract.documents || [],
-    }))
+      console.log("[CONTRACTS] Supabase contracts loaded:", data?.length || 0)
+
+      return (data || []).map((contract) => ({
+        ...contract,
+        documents: typeof contract.documents === "string" ? JSON.parse(contract.documents) : contract.documents || [],
+      }))
+    } catch (error) {
+      console.log("[CONTRACTS] Supabase failed, falling back to demo mode:", error)
+      const contracts = this.getDemoData("contracts")
+      console.log("[CONTRACTS] Fallback contracts loaded:", contracts.length)
+      return contracts
+    }
   }
 
   static async createContract(contract: Omit<Contract, "id" | "createdDate" | "updatedDate">): Promise<Contract> {
+    console.log("[CONTRACTS] Creating contract:", contract)
+
     if (await this.isDemoMode()) {
+      console.log("[CONTRACTS] Using demo mode for contract creation")
       const newContract: Contract = {
         ...contract,
         id: this.generateId(),
@@ -785,88 +805,187 @@ export class SupabaseClientDB {
       const contracts = this.getDemoData("contracts")
       contracts.unshift(newContract)
       this.setDemoData("contracts", contracts)
+      console.log("[CONTRACTS] Demo contract created:", newContract.id)
       return newContract
     }
 
-    const supabase = this.getClient()
-    const { data, error } = await supabase
-      .from("contracts")
-      .insert({
-        title: contract.title,
-        description: contract.description,
-        organization_id: contract.organization_id || contract.organizationId,
-        contact_id: contract.contact_id || contract.contactId,
-        value: contract.value,
-        currency: contract.currency,
-        status: contract.status,
-        assigned_to: contract.assigned_to || contract.assignedTo,
-        expiration_date: contract.expiration_date || contract.expirationDate,
-        signed_date: contract.signed_date || contract.signedDate,
-        notes: contract.notes,
-        documents: contract.documents || [],
-        created_date: new Date().toISOString(),
-        updated_date: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    try {
+      const supabase = this.getClient()
+      const { data, error } = await supabase
+        .from("contracts")
+        .insert({
+          title: contract.title,
+          description: contract.description,
+          organization_id: contract.organization_id || contract.organizationId,
+          contact_id: contract.contact_id || contract.contactId,
+          value: contract.value,
+          currency: contract.currency,
+          status: contract.status,
+          assigned_to: contract.assigned_to || contract.assignedTo,
+          expiration_date: contract.expiration_date || contract.expirationDate,
+          signed_date: contract.signed_date || contract.signedDate,
+          sent_date: contract.sent_date,
+          notes: contract.notes,
+          documents: contract.documents || [],
+          created_date: new Date().toISOString(),
+          updated_date: new Date().toISOString(),
+        })
+        .select()
+        .single()
 
-    if (error) throw error
+      if (error) {
+        console.error("[CONTRACTS] Supabase create error:", error)
+        throw error
+      }
 
-    return {
-      ...data,
-      documents: Array.isArray(data.documents)
-        ? data.documents
-        : typeof data.documents === "string"
-          ? JSON.parse(data.documents)
-          : [],
+      console.log("[CONTRACTS] Contract created successfully in Supabase:", data.id)
+      return {
+        ...data,
+        documents: Array.isArray(data.documents)
+          ? data.documents
+          : typeof data.documents === "string"
+            ? JSON.parse(data.documents)
+            : [],
+      }
+    } catch (error) {
+      console.error("[CONTRACTS] Supabase creation failed:", error)
+      throw error
     }
   }
 
+  // ✅ FONCTION UPDATECONTRACT COMPLÈTEMENT RECODÉE AVEC DEBUG
   static async updateContract(id: string, updates: Partial<Contract>): Promise<Contract> {
+    console.group(`[CONTRACT UPDATE] ⚡ Updating contract ${id}`)
+    console.log('📝 Original updates:', updates)
+    
+    // Vérifier le format des dates
+    if (updates.sent_date) {
+      console.log('📅 sent_date format:', typeof updates.sent_date, updates.sent_date)
+      console.log('📅 sent_date is valid date?', !isNaN(new Date(updates.sent_date).getTime()))
+    }
+    
+    if (updates.signed_date) {
+      console.log('📅 signed_date format:', typeof updates.signed_date, updates.signed_date)
+      console.log('📅 signed_date is valid date?', !isNaN(new Date(updates.signed_date).getTime()))
+    }
+    
+    // S'assurer du bon format ISO pour les dates
+    const processedUpdates = { ...updates }
+    
+    if (processedUpdates.sent_date && typeof processedUpdates.sent_date === 'string') {
+      try {
+        processedUpdates.sent_date = new Date(processedUpdates.sent_date).toISOString()
+        console.log('📅 Processed sent_date:', processedUpdates.sent_date)
+      } catch (error) {
+        console.error('❌ Error processing sent_date:', error)
+      }
+    }
+    
+    if (processedUpdates.signed_date && typeof processedUpdates.signed_date === 'string') {
+      try {
+        processedUpdates.signed_date = new Date(processedUpdates.signed_date).toISOString()
+        console.log('📅 Processed signed_date:', processedUpdates.signed_date)
+      } catch (error) {
+        console.error('❌ Error processing signed_date:', error)
+      }
+    }
+    
+    console.log('🚀 Final updates to send:', processedUpdates)
+
+    // Check if demo mode
     if (await this.isDemoMode()) {
+      console.log('🎭 Using demo mode for contract update')
       const contracts = this.getDemoData("contracts")
       const index = contracts.findIndex((contract: Contract) => contract.id === id)
       if (index !== -1) {
         contracts[index] = {
           ...contracts[index],
-          ...updates,
+          ...processedUpdates,
           updatedDate: new Date().toISOString(),
         }
         this.setDemoData("contracts", contracts)
+        console.log('✅ Demo contract updated successfully')
+        console.groupEnd()
         return contracts[index]
       }
+      console.error('❌ Contract not found in demo mode')
+      console.groupEnd()
       throw new Error("Contract not found")
     }
 
-    const supabase = this.getClient()
+    try {
+      console.log('🔄 Using Supabase for contract update')
+      const supabase = this.getClient()
 
-    const updateData = { ...updates, updated_date: new Date().toISOString() }
-    if (updateData.documents) {
-      updateData.documents = JSON.stringify(updateData.documents)
-    }
+      // Prepare update data with correct column name
+      const updateData = { 
+        ...processedUpdates, 
+        updated_date: new Date().toISOString()  // Correct column name
+      }
+      
+      if (updateData.documents) {
+        updateData.documents = JSON.stringify(updateData.documents)
+      }
 
-    const { data, error } = await supabase.from("contracts").update(updateData).eq("id", id).select().single()
+      console.log('📤 Sending to Supabase:', updateData)
 
-    if (error) throw error
+      const { data, error } = await supabase
+        .from("contracts")
+        .update(updateData)
+        .eq("id", id)
+        .select('*')  // Select all fields to see what was updated
+        .single()
 
-    return {
-      ...data,
-      documents: typeof data.documents === "string" ? JSON.parse(data.documents) : data.documents || [],
+      if (error) {
+        console.error('❌ Supabase error:', error)
+        console.error('❌ Error details:', error.message, error.details, error.hint)
+        console.groupEnd()
+        throw error
+      }
+
+      console.log('✅ Supabase response:', data)
+      console.log('✅ sent_date in response:', data?.sent_date)
+      console.log('✅ signed_date in response:', data?.signed_date)
+      console.log('✅ updated_date in response:', data?.updated_date)
+
+      const result = {
+        ...data,
+        documents: typeof data.documents === "string" ? JSON.parse(data.documents) : data.documents || [],
+      }
+
+      console.log('🎉 Contract updated successfully!')
+      console.groupEnd()
+      return result
+
+    } catch (error) {
+      console.error('💥 Update failed completely:', error)
+      console.error('💥 Error stack:', error.stack)
+      console.groupEnd()
+      throw error
     }
   }
 
   static async deleteContract(id: string): Promise<void> {
+    console.log("[CONTRACTS] Deleting contract:", id)
+
     if (await this.isDemoMode()) {
       const contracts = this.getDemoData("contracts")
       const filtered = contracts.filter((contract: Contract) => contract.id !== id)
       this.setDemoData("contracts", filtered)
+      console.log("[CONTRACTS] Demo contract deleted")
       return
     }
 
-    const supabase = this.getClient()
-    const { error } = await supabase.from("contracts").delete().eq("id", id)
+    try {
+      const supabase = this.getClient()
+      const { error } = await supabase.from("contracts").delete().eq("id", id)
 
-    if (error) throw error
+      if (error) throw error
+      console.log("[CONTRACTS] Contract deleted from Supabase")
+    } catch (error) {
+      console.error("[CONTRACTS] Delete failed:", error)
+      throw error
+    }
   }
 
   static async getContractsByOrganization(organizationId: string): Promise<Contract[]> {
@@ -1440,6 +1559,7 @@ export class SupabaseClientDB {
           {
             id: "demo-contract-1",
             organizationId: "demo-org-1",
+            organization_id: "demo-org-1",
             title: "Contrat CRM Hôtel Le Grand Mauricien",
             description: "Solution CRM complète pour la gestion hôtelière",
             value: 15000,
@@ -1448,8 +1568,12 @@ export class SupabaseClientDB {
             assignedTo: "Marie Lagesse",
             createdDate: new Date("2024-03-01"),
             updatedDate: new Date("2024-03-01"),
+            created_date: "2024-03-01T10:00:00Z",
+            updated_date: "2024-03-01T10:00:00Z",
             documents: [],
             notes: "Contrat envoyé suite à la démonstration",
+            sent_date: null,
+            signed_date: null,
           },
         ]
 
