@@ -33,85 +33,6 @@ const CONTRACT_STATUS_LABELS = {
 
 type ContractStatus = keyof typeof CONTRACT_STATUS_LABELS
 
-// ✅ NOUVEAU : Composant de debug spécifique pour la modal Organisation
-const ContractOrganizationDebugger = ({ organizationId }: { organizationId: string }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastResult, setLastResult] = useState(null);
-
-  const testDirectContractCreation = async () => {
-    setIsLoading(true);
-    console.clear();
-    console.log('🧪 TESTING CONTRACT CREATION FROM ORGANIZATION MODAL');
-    console.log('🏢 Organization ID:', organizationId);
-    
-    try {
-      const testContractData = {
-        organization_id: organizationId,
-        contact_id: null,
-        description: `Test contrat depuis organisation - ${new Date().toLocaleString()}`,
-        status: 'envoye',
-        signed_date: null,
-        sent_date: new Date().toISOString(),
-        notes: "",
-        documents: [],
-        created_date: new Date().toISOString(),
-        updated_date: new Date().toISOString(),
-      };
-      
-      console.log('📤 Test contract data:', testContractData);
-      
-      const result = await SupabaseClientDB.createContract(testContractData);
-      console.log('✅ Contract creation result:', result);
-      
-      setLastResult({ success: true, data: result });
-      alert('✅ Test de création de contrat réussi ! Vérifiez la console et rechargez les contrats.');
-      
-    } catch (error) {
-      console.error('💥 Contract creation failed:', error);
-      setLastResult({ success: false, error: error.message });
-      alert(`❌ Test de création échoué: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <Card className="mb-4 border-purple-200 bg-purple-50">
-      <CardHeader>
-        <CardTitle className="text-purple-800 text-sm">🔧 Debug Contrat - Modal Organisation</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-2">
-        <div className="space-y-3">
-          <div className="flex gap-2 items-center">
-            <Button 
-              onClick={testDirectContractCreation} 
-              disabled={isLoading} 
-              size="sm"
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              Test Création Contrat
-            </Button>
-            <span className="text-xs text-purple-600">Org: {organizationId.substring(0, 8)}...</span>
-          </div>
-          
-          {lastResult && (
-            <div className="bg-white p-2 rounded border max-h-32 overflow-auto">
-              <h4 className="font-bold text-xs">Résultat:</h4>
-              <pre className="text-xs mt-1">
-                {JSON.stringify(lastResult, null, 2)}
-              </pre>
-            </div>
-          )}
-          
-          <p className="text-xs text-purple-600">
-            💡 Console (F12) pour détails complets
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
 export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdate }: OrganizationDetailModalProps) {
   const [notes, setNotes] = useState("")
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -365,7 +286,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     console.log("[ORG-MODAL] ⚡ Contract form reset completed")
   }
 
-  // ✅ CRÉATION/MODIFICATION CONTRAT ENTIÈREMENT CORRIGÉE ET SYNCHRONISÉE avec contracts-tab.tsx
+  // CRÉATION/MODIFICATION CONTRAT ENTIÈREMENT CORRIGÉE ET SYNCHRONISÉE avec contracts-tab.tsx
   const handleCreateContract = async () => {
     if (!organization) return
     setLoading(true)
@@ -395,19 +316,18 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         }),
       )
 
-      // ✅ STRUCTURE HARMONISÉE avec contracts-tab.tsx
+      // STRUCTURE HARMONISÉE avec contracts-tab.tsx
       const contractData = {
-        organization_id: organization.id, // ✅ Correctement défini
+        organization_id: organization.id,
         contact_id: null,
         description: contractForm.description,
         status: contractForm.status,
         signed_date: contractForm.status === "signe" && contractForm.signatureDate 
-          ? new Date(contractForm.signatureDate).toISOString() // ✅ Converti en ISO
+          ? new Date(contractForm.signatureDate).toISOString()
           : null,
-        sent_date: contractForm.sentDate ? new Date(contractForm.sentDate).toISOString() : null, // ✅ Converti en ISO
+        sent_date: contractForm.sentDate ? new Date(contractForm.sentDate).toISOString() : null,
         notes: "",
         documents: documents,
-        // ✅ AJOUT des champs manquants pour éviter les erreurs
         created_date: new Date().toISOString(),
         updated_date: new Date().toISOString(),
       }
@@ -432,7 +352,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
       
     } catch (error) {
       console.error("[ORG-MODAL] Error saving contract:", error)
-      // ✅ Gestion d'erreur détaillée comme dans contracts-tab.tsx
+      // Gestion d'erreur détaillée comme dans contracts-tab.tsx
       if (error.message) {
         toast.error(`Erreur lors de la sauvegarde: ${error.message}`)
       } else {
@@ -443,14 +363,14 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     }
   }
 
-  // ✅ ÉDITION CONTRAT CORRIGÉE pour utiliser les bonnes propriétés
+  // ÉDITION CONTRAT CORRIGÉE pour utiliser les bonnes propriétés
   const handleEditContract = (contract: Contract) => {
     console.log("[ORG-MODAL] ⚡ Starting edit for contract:", contract.id)
     setEditingContract(contract)
     setContractForm({
       description: contract.description || "",
       status: (contract.status as ContractStatus) || "envoye",
-      // ✅ FIX: Utiliser les bonnes propriétés sent_date et signed_date
+      // FIX: Utiliser les bonnes propriétés sent_date et signed_date
       sentDate: contract.sent_date ? new Date(contract.sent_date).toISOString().split("T")[0] : "",
       signatureDate: contract.signed_date ? new Date(contract.signed_date).toISOString().split("T")[0] : "",
     })
@@ -904,7 +824,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
             </div>
           </TabsContent>
 
-          {/* ✅ ONGLET CONTRATS COMPLÈTEMENT RÉVISÉ ET HARMONISÉ avec contracts-tab.tsx */}
+          {/* ONGLET CONTRATS HARMONISÉ avec contracts-tab.tsx */}
           <TabsContent value="contracts" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Contrats ({contracts.length})</h3>
@@ -913,9 +833,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                 Nouveau Contrat
               </Button>
             </div>
-
-            {/* ✅ AJOUT DU COMPOSANT DE DEBUG */}
-            <ContractOrganizationDebugger organizationId={organization.id} />
 
             {showContractForm && (
               <Card>
