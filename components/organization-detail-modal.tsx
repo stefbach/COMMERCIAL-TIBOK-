@@ -33,6 +33,85 @@ const CONTRACT_STATUS_LABELS = {
 
 type ContractStatus = keyof typeof CONTRACT_STATUS_LABELS
 
+// ✅ NOUVEAU : Composant de debug spécifique pour la modal Organisation
+const ContractOrganizationDebugger = ({ organizationId }: { organizationId: string }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
+
+  const testDirectContractCreation = async () => {
+    setIsLoading(true);
+    console.clear();
+    console.log('🧪 TESTING CONTRACT CREATION FROM ORGANIZATION MODAL');
+    console.log('🏢 Organization ID:', organizationId);
+    
+    try {
+      const testContractData = {
+        organization_id: organizationId,
+        contact_id: null,
+        description: `Test contrat depuis organisation - ${new Date().toLocaleString()}`,
+        status: 'envoye',
+        signed_date: null,
+        sent_date: new Date().toISOString(),
+        notes: "",
+        documents: [],
+        created_date: new Date().toISOString(),
+        updated_date: new Date().toISOString(),
+      };
+      
+      console.log('📤 Test contract data:', testContractData);
+      
+      const result = await SupabaseClientDB.createContract(testContractData);
+      console.log('✅ Contract creation result:', result);
+      
+      setLastResult({ success: true, data: result });
+      alert('✅ Test de création de contrat réussi ! Vérifiez la console et rechargez les contrats.');
+      
+    } catch (error) {
+      console.error('💥 Contract creation failed:', error);
+      setLastResult({ success: false, error: error.message });
+      alert(`❌ Test de création échoué: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card className="mb-4 border-purple-200 bg-purple-50">
+      <CardHeader>
+        <CardTitle className="text-purple-800 text-sm">🔧 Debug Contrat - Modal Organisation</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-2">
+        <div className="space-y-3">
+          <div className="flex gap-2 items-center">
+            <Button 
+              onClick={testDirectContractCreation} 
+              disabled={isLoading} 
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              Test Création Contrat
+            </Button>
+            <span className="text-xs text-purple-600">Org: {organizationId.substring(0, 8)}...</span>
+          </div>
+          
+          {lastResult && (
+            <div className="bg-white p-2 rounded border max-h-32 overflow-auto">
+              <h4 className="font-bold text-xs">Résultat:</h4>
+              <pre className="text-xs mt-1">
+                {JSON.stringify(lastResult, null, 2)}
+              </pre>
+            </div>
+          )}
+          
+          <p className="text-xs text-purple-600">
+            💡 Console (F12) pour détails complets
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdate }: OrganizationDetailModalProps) {
   const [notes, setNotes] = useState("")
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -119,10 +198,13 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
   const loadContracts = async () => {
     if (!organization) return
     try {
+      console.log("[ORG-MODAL] Loading contracts for organization:", organization.id)
       const data = await SupabaseClientDB.getContractsByOrganization(organization.id)
+      console.log("[ORG-MODAL] Contracts loaded:", data.length, "contracts")
       setContracts(data)
     } catch (error) {
-      console.error("Error loading contracts:", error)
+      console.error("[ORG-MODAL] Error loading contracts:", error)
+      setContracts([]) // Fallback to empty array
     }
   }
 
@@ -280,19 +362,22 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
     setSelectedFiles([])
     setShowContractForm(false)
     setEditingContract(null)
+    console.log("[ORG-MODAL] ⚡ Contract form reset completed")
   }
 
-  // CRÉATION/MODIFICATION CONTRAT SYNCHRONISÉE avec contracts-tab.tsx
+  // ✅ CRÉATION/MODIFICATION CONTRAT ENTIÈREMENT CORRIGÉE ET SYNCHRONISÉE avec contracts-tab.tsx
   const handleCreateContract = async () => {
     if (!organization) return
     setLoading(true)
     try {
+      console.log("[ORG-MODAL] Creating contract for organization:", organization.id)
+      console.log("[ORG-MODAL] Contract form data:", contractForm)
+      
       const documents = await Promise.all(
         selectedFiles.map(async (file) => {
           let base64Data = (file as any).base64
 
           if (!base64Data) {
-            // Convert file to base64 if not already done
             base64Data = await new Promise((resolve) => {
               const reader = new FileReader()
               reader.onload = () => resolve(reader.result)
@@ -310,47 +395,64 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         }),
       )
 
-      const contractData: Omit<Contract, "id" | "createdDate" | "updatedDate"> = {
-        description: contractForm.description,
-        organization_id: organization.id,
+      // ✅ STRUCTURE HARMONISÉE avec contracts-tab.tsx
+      const contractData = {
+        organization_id: organization.id, // ✅ Correctement défini
         contact_id: null,
+        description: contractForm.description,
         status: contractForm.status,
-        assigned_to: "",
-        notes: "",
-        title: "",
-        value: 0,
-        documents: documents,
         signed_date: contractForm.status === "signe" && contractForm.signatureDate 
-          ? new Date(contractForm.signatureDate) 
-          : undefined,
-        sent_date: contractForm.sentDate ? new Date(contractForm.sentDate) : undefined,
+          ? new Date(contractForm.signatureDate).toISOString() // ✅ Converti en ISO
+          : null,
+        sent_date: contractForm.sentDate ? new Date(contractForm.sentDate).toISOString() : null, // ✅ Converti en ISO
+        notes: "",
+        documents: documents,
+        // ✅ AJOUT des champs manquants pour éviter les erreurs
+        created_date: new Date().toISOString(),
+        updated_date: new Date().toISOString(),
       }
 
+      console.log("[ORG-MODAL] Contract data prepared:", contractData)
+
+      let result
       if (editingContract) {
-        await SupabaseClientDB.updateContract(editingContract.id, contractData)
+        console.log("[ORG-MODAL] ⚡ UPDATING existing contract:", editingContract.id)
+        result = await SupabaseClientDB.updateContract(editingContract.id, contractData)
+        console.log("[ORG-MODAL] Contract updated successfully:", result)
         toast.success("Contrat modifié avec succès")
       } else {
-        await SupabaseClientDB.createContract(contractData)
+        console.log("[ORG-MODAL] ⚡ CREATING new contract")
+        result = await SupabaseClientDB.createContract(contractData)
+        console.log("[ORG-MODAL] Contract created successfully:", result)
         toast.success("Contrat créé avec succès")
       }
 
       resetContractForm()
-      loadContracts()
+      loadContracts() // Recharger la liste des contrats
+      
     } catch (error) {
-      console.error("Error saving contract:", error)
-      toast.error("Erreur lors de la sauvegarde du contrat")
+      console.error("[ORG-MODAL] Error saving contract:", error)
+      // ✅ Gestion d'erreur détaillée comme dans contracts-tab.tsx
+      if (error.message) {
+        toast.error(`Erreur lors de la sauvegarde: ${error.message}`)
+      } else {
+        toast.error("Erreur lors de la sauvegarde du contrat")
+      }
     } finally {
       setLoading(false)
     }
   }
 
+  // ✅ ÉDITION CONTRAT CORRIGÉE pour utiliser les bonnes propriétés
   const handleEditContract = (contract: Contract) => {
+    console.log("[ORG-MODAL] ⚡ Starting edit for contract:", contract.id)
     setEditingContract(contract)
     setContractForm({
       description: contract.description || "",
       status: (contract.status as ContractStatus) || "envoye",
-      sentDate: contract.sent_date ? contract.sent_date.toISOString().split("T")[0] : "",
-      signatureDate: contract.signedDate ? contract.signedDate.toISOString().split("T")[0] : "",
+      // ✅ FIX: Utiliser les bonnes propriétés sent_date et signed_date
+      sentDate: contract.sent_date ? new Date(contract.sent_date).toISOString().split("T")[0] : "",
+      signatureDate: contract.signed_date ? new Date(contract.signed_date).toISOString().split("T")[0] : "",
     })
     setSelectedFiles([])
     setShowContractForm(true)
@@ -361,11 +463,13 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
 
     setLoading(true)
     try {
+      console.log("[ORG-MODAL] ⚡ Deleting contract:", contractId)
       await SupabaseClientDB.deleteContract(contractId)
+      console.log("[ORG-MODAL] Contract deleted successfully")
       toast.success("Contrat supprimé avec succès")
       loadContracts()
     } catch (error) {
-      console.error("Error deleting contract:", error)
+      console.error("[ORG-MODAL] Error deleting contract:", error)
       toast.error("Erreur lors de la suppression du contrat")
     } finally {
       setLoading(false)
@@ -382,7 +486,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        console.log("[v0] Document downloaded:", doc.name)
+        console.log("[ORG-MODAL] Document downloaded:", doc.name)
       } else if (doc.url) {
         const link = document.createElement("a")
         link.href = doc.url
@@ -390,12 +494,12 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        console.log("[v0] Document downloaded (fallback):", doc.name)
+        console.log("[ORG-MODAL] Document downloaded (fallback):", doc.name)
       } else {
         throw new Error("No valid download data found")
       }
     } catch (error) {
-      console.error("[v0] Error downloading document:", error)
+      console.error("[ORG-MODAL] Error downloading document:", error)
       alert(`Erreur lors du téléchargement de ${doc.name}. Le fichier pourrait ne plus être disponible.`)
     }
   }
@@ -800,7 +904,7 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
             </div>
           </TabsContent>
 
-          {/* ONGLET CONTRATS COMPLÈTEMENT SYNCHRONISÉ avec contracts-tab.tsx */}
+          {/* ✅ ONGLET CONTRATS COMPLÈTEMENT RÉVISÉ ET HARMONISÉ avec contracts-tab.tsx */}
           <TabsContent value="contracts" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Contrats ({contracts.length})</h3>
@@ -809,6 +913,9 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                 Nouveau Contrat
               </Button>
             </div>
+
+            {/* ✅ AJOUT DU COMPOSANT DE DEBUG */}
+            <ContractOrganizationDebugger organizationId={organization.id} />
 
             {showContractForm && (
               <Card>
@@ -941,8 +1048,6 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
 
             <div className="space-y-4">
               {contracts.map((contract) => {
-                const organizationId = (contract as any).organization_id || contract.organizationId
-                
                 return (
                   <Card key={contract.id}>
                     <CardContent className="pt-4">
@@ -951,6 +1056,9 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                           <div className="flex items-center gap-3 mb-2">
                             <Badge className={getStatusBadgeColor(contract.status)}>
                               {CONTRACT_STATUS_LABELS[contract.status as ContractStatus] || contract.status}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              ID: {contract.id.slice(-8)}
                             </Badge>
                           </div>
                           
@@ -967,10 +1075,10 @@ export function OrganizationDetailModal({ isOpen, onClose, organization, onUpdat
                                 <span>Envoyé le: {new Date(contract.sent_date).toLocaleDateString("fr-FR")}</span>
                               </div>
                             )}
-                            {contract.signedDate && (
+                            {contract.signed_date && (
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4" />
-                                <span>Signé le: {new Date(contract.signedDate).toLocaleDateString("fr-FR")}</span>
+                                <span>Signé le: {new Date(contract.signed_date).toLocaleDateString("fr-FR")}</span>
                               </div>
                             )}
                           </div>
